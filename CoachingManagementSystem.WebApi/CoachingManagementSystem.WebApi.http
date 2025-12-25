@@ -1,0 +1,6 @@
+@CoachingManagementSystem.WebApi_HostAddress = http://localhost:5053
+
+GET {{CoachingManagementSystem.WebApi_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
