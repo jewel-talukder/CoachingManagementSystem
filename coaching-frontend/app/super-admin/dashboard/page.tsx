@@ -1,12 +1,15 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { superAdminApi } from '@/lib/api';
 import { Building2, Users, GraduationCap, BookOpen, Shield } from 'lucide-react';
+import SuperAdminLayout from '@/components/layouts/SuperAdminLayout';
 
 export default function SuperAdminDashboard() {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string>('');
 
   useEffect(() => {
     fetchDashboard();
@@ -14,10 +17,12 @@ export default function SuperAdminDashboard() {
 
   const fetchDashboard = async () => {
     try {
+      setError('');
       const response = await superAdminApi.getDashboard();
       setData(response.data);
-    } catch (error) {
-      console.error('Failed to fetch dashboard:', error);
+    } catch (err: any) {
+      console.error('Failed to fetch dashboard:', err);
+      setError(err.response?.data?.message || 'Failed to load dashboard data');
     } finally {
       setLoading(false);
     }
@@ -25,62 +30,71 @@ export default function SuperAdminDashboard() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-      </div>
+      <SuperAdminLayout>
+        <div className="flex items-center justify-center h-96">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+            <p className="mt-4 text-gray-600">Loading dashboard...</p>
+          </div>
+        </div>
+      </SuperAdminLayout>
     );
   }
 
   const stats = [
     {
       name: 'Total Coachings',
-      value: data?.summary?.totalCoachings || 0,
+      value: data?.Summary?.TotalCoachings || 0,
       icon: Building2,
       color: 'bg-blue-500',
     },
     {
       name: 'Active Coachings',
-      value: data?.summary?.activeCoachings || 0,
+      value: data?.Summary?.ActiveCoachings || 0,
       icon: Shield,
       color: 'bg-green-500',
     },
     {
+      name: 'Blocked Coachings',
+      value: data?.Summary?.BlockedCoachings || 0,
+      icon: Shield,
+      color: 'bg-red-500',
+    },
+    {
       name: 'Total Users',
-      value: data?.summary?.totalUsers || 0,
+      value: data?.Summary?.TotalUsers || 0,
       icon: Users,
       color: 'bg-purple-500',
     },
     {
       name: 'Total Students',
-      value: data?.summary?.totalStudents || 0,
+      value: data?.Summary?.TotalStudents || 0,
       icon: GraduationCap,
       color: 'bg-orange-500',
     },
     {
       name: 'Total Teachers',
-      value: data?.summary?.totalTeachers || 0,
+      value: data?.Summary?.TotalTeachers || 0,
       icon: BookOpen,
       color: 'bg-indigo-500',
     },
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <nav className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16">
-            <div className="flex items-center">
-              <h1 className="text-xl font-bold text-blue-600">Super Admin Dashboard</h1>
-            </div>
-          </div>
+    <SuperAdminLayout>
+      <div className="max-w-7xl mx-auto w-full">
+        <div className="mb-6">
+          <h1 className="text-3xl font-bold text-gray-900">SaaS Overview</h1>
+          <p className="text-gray-600 mt-2">Monitor and manage all coaching centers</p>
         </div>
-      </nav>
 
-      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-        <div className="px-4 py-6 sm:px-0">
-          <h1 className="text-3xl font-bold text-gray-900 mb-6">SaaS Overview</h1>
+        {error && (
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
+            {error}
+          </div>
+        )}
 
-          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-5 mb-8">
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 mb-8">
             {stats.map((stat) => {
               const Icon = stat.icon;
               return (
@@ -132,47 +146,54 @@ export default function SuperAdminDashboard() {
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {data?.coachings?.map((coaching: any) => (
-                      <tr key={coaching.id}>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                          {coaching.name}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span
-                            className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                              coaching.isActive && !coaching.isBlocked
-                                ? 'bg-green-100 text-green-800'
-                                : 'bg-red-100 text-red-800'
-                            }`}
-                          >
-                            {coaching.isBlocked
-                              ? 'Blocked'
-                              : coaching.isActive
-                              ? 'Active'
-                              : 'Inactive'}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {coaching.subscriptionStatus}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {coaching.planName || '-'}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {coaching.subscriptionExpiresAt
-                            ? new Date(coaching.subscriptionExpiresAt).toLocaleDateString()
-                            : '-'}
+                    {data?.Coachings && data.Coachings.length > 0 ? (
+                      data.Coachings.map((coaching: any) => (
+                        <tr key={coaching.Id} className="hover:bg-gray-50">
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                            {coaching.Name}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span
+                              className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                                coaching.IsActive && !coaching.IsBlocked
+                                  ? 'bg-green-100 text-green-800'
+                                  : 'bg-red-100 text-red-800'
+                              }`}
+                            >
+                              {coaching.IsBlocked
+                                ? 'Blocked'
+                                : coaching.IsActive
+                                ? 'Active'
+                                : 'Inactive'}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {coaching.SubscriptionStatus}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {coaching.PlanName || '-'}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {coaching.SubscriptionExpiresAt
+                              ? new Date(coaching.SubscriptionExpiresAt).toLocaleDateString()
+                              : '-'}
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={5} className="px-6 py-4 text-center text-sm text-gray-500">
+                          No coachings found
                         </td>
                       </tr>
-                    ))}
+                    )}
                   </tbody>
                 </table>
               </div>
             </div>
           </div>
-        </div>
-      </main>
-    </div>
+      </div>
+    </SuperAdminLayout>
   );
 }
 

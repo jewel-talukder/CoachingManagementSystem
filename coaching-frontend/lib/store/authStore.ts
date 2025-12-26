@@ -31,6 +31,8 @@ export const useAuthStore = create<AuthState>()(
         if (typeof window !== 'undefined') {
           localStorage.setItem('token', token);
           localStorage.setItem('user', JSON.stringify(user));
+          // Set cookie for middleware
+          document.cookie = `token=${token}; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Lax`;
         }
       },
       logout: () => {
@@ -38,6 +40,8 @@ export const useAuthStore = create<AuthState>()(
         if (typeof window !== 'undefined') {
           localStorage.removeItem('token');
           localStorage.removeItem('user');
+          // Remove cookie
+          document.cookie = 'token=; path=/; max-age=0';
         }
       },
       hasRole: (role) => {

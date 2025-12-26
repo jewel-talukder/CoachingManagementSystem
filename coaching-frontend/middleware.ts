@@ -5,19 +5,19 @@ export function middleware(request: NextRequest) {
   const token = request.cookies.get('token')?.value;
   const path = request.nextUrl.pathname;
 
-  // Public routes
-  const publicRoutes = ['/login', '/register'];
-  const isPublicRoute = publicRoutes.some(route => path.startsWith(route));
+  // Public routes - home page is public, no redirect to login
+  const isHomePage = path === '/';
+  const isLoginPage = path === '/login';
+  const isRegisterPage = path === '/register';
+  const isPublicRoute = isHomePage || isLoginPage || isRegisterPage;
 
   // If accessing a protected route without token, redirect to login
   if (!isPublicRoute && !token) {
     return NextResponse.redirect(new URL('/login', request.url));
   }
 
-  // If accessing login/register with token, redirect to dashboard
-  if (isPublicRoute && token) {
-    return NextResponse.redirect(new URL('/', request.url));
-  }
+  // Allow access to login/register pages even with token (user might want to switch accounts)
+  // Only redirect if explicitly needed - for now, allow access
 
   return NextResponse.next();
 }
