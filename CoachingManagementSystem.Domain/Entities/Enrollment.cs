@@ -5,6 +5,9 @@ public class Enrollment : BaseEntity
     public int CoachingId { get; set; }
     public Coaching Coaching { get; set; } = null!;
     
+    public int BranchId { get; set; }
+    public Branch Branch { get; set; } = null!;
+    
     public int StudentId { get; set; }
     public Student Student { get; set; } = null!;
     

@@ -1,0 +1,298 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
+import { useRouter, useParams } from 'next/navigation';
+import AdminLayout from '@/components/layouts/AdminLayout';
+import { enrollmentsApi, coursesApi, batchesApi, usersApi } from '@/lib/api';
+import { useToastStore } from '@/lib/store/toastStore';
+
+const enrollmentSchema = z.object({
+  studentId: z.number().min(1, 'Student is required').optional(),
+  courseId: z.number().min(1, 'Course is required').optional(),
+  batchId: z.number().min(1, 'Batch is required').optional(),
+  status: z.string().optional(),
+  feePaid: z.number().min(0).optional(),
+  totalFee: z.number().min(0).optional(),
+});
+
+type EnrollmentFormData = z.infer<typeof enrollmentSchema>;
+
+export default function EditEnrollmentPage() {
+  const params = useParams();
+  const enrollmentId = Number(params.id);
+  const router = useRouter();
+  const { addToast } = useToastStore();
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [fetching, setFetching] = useState(true);
+  const [courses, setCourses] = useState<any[]>([]);
+  const [batches, setBatches] = useState<any[]>([]);
+  const [students, setStudents] = useState<any[]>([]);
+  const [enrollment, setEnrollment] = useState<any>(null);
+  const [selectedCourse, setSelectedCourse] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (enrollmentId) {
+      fetchEnrollment();
+      fetchCourses();
+      fetchStudents();
+    }
+  }, [enrollmentId]);
+
+  useEffect(() => {
+    if (selectedCourse) {
+      fetchBatches(selectedCourse);
+    }
+  }, [selectedCourse]);
+
+  const fetchEnrollment = async () => {
+    try {
+      setFetching(true);
+      const response = await enrollmentsApi.getById(enrollmentId);
+      const enrollmentData = response.data;
+      setEnrollment(enrollmentData);
+      setSelectedCourse(enrollmentData.courseId);
+      
+      // Set form values
+      setValue('studentId', enrollmentData.studentId);
+      setValue('courseId', enrollmentData.courseId);
+      setValue('batchId', enrollmentData.batchId);
+      setValue('status', enrollmentData.status);
+      setValue('feePaid', enrollmentData.feePaid);
+      setValue('totalFee', enrollmentData.totalFee);
+    } catch (error: any) {
+      console.error('Failed to fetch enrollment:', error);
+      addToast(error.response?.data?.message || 'Failed to load enrollment', 'error');
+      router.push('/admin/enrollments');
+    } finally {
+      setFetching(false);
+    }
+  };
+
+  const fetchCourses = async () => {
+    try {
+      const response = await coursesApi.getAll({ isActive: true });
+      setCourses(response.data.data || response.data);
+    } catch (error) {
+      console.error('Failed to fetch courses:', error);
+    }
+  };
+
+  const fetchBatches = async (courseId: number) => {
+    try {
+      const response = await batchesApi.getAll({ courseId, isActive: true });
+      setBatches(response.data);
+    } catch (error) {
+      console.error('Failed to fetch batches:', error);
+    }
+  };
+
+  const fetchStudents = async () => {
+    try {
+      const response = await usersApi.getAll({ role: 'Student', isActive: true });
+      setStudents(response.data);
+    } catch (error) {
+      console.error('Failed to fetch students:', error);
+    }
+  };
+
+  const {
+    register,
+    handleSubmit,
+    watch,
+    setValue,
+    formState: { errors },
+  } = useForm<EnrollmentFormData>({
+    resolver: zodResolver(enrollmentSchema),
+  });
+
+  const courseId = watch('courseId');
+
+  useEffect(() => {
+    if (courseId) {
+      setSelectedCourse(courseId);
+    }
+  }, [courseId]);
+
+  const onSubmit = async (data: EnrollmentFormData) => {
+    setError(null);
+    setLoading(true);
+
+    try {
+      // Only send fields that have values
+      const updateData: any = {};
+      if (data.studentId) updateData.studentId = data.studentId;
+      if (data.courseId) updateData.courseId = data.courseId;
+      if (data.batchId) updateData.batchId = data.batchId;
+      if (data.status) updateData.status = data.status;
+      if (data.feePaid !== undefined) updateData.feePaid = data.feePaid;
+      if (data.totalFee !== undefined) updateData.totalFee = data.totalFee;
+
+      await enrollmentsApi.update(enrollmentId, updateData);
+      addToast('Enrollment updated successfully', 'success');
+      router.push('/admin/enrollments');
+    } catch (err: any) {
+      const errorMessage = err.response?.data?.message || 'Failed to update enrollment';
+      setError(errorMessage);
+      addToast(errorMessage, 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (fetching) {
+    return (
+      <AdminLayout>
+        <div className="flex justify-center items-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        </div>
+      </AdminLayout>
+    );
+  }
+
+  return (
+    <AdminLayout>
+      <div className="px-4 py-6 sm:px-0">
+        <h1 className="text-3xl font-bold text-gray-900 mb-6">Edit Enrollment</h1>
+
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4">
+            {error}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit(onSubmit)} className="bg-white shadow rounded-lg p-6">
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+            <div>
+              <label htmlFor="studentId" className="block text-sm font-medium text-gray-700">
+                Student *
+              </label>
+              <select
+                {...register('studentId', { valueAsNumber: true })}
+                id="studentId"
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-3 py-2 border"
+              >
+                <option value="">Select a student</option>
+                {students.map((student) => (
+                  <option key={student.id} value={student.id}>
+                    {student.firstName} {student.lastName} - {student.email}
+                  </option>
+                ))}
+              </select>
+              {errors.studentId && (
+                <p className="mt-1 text-sm text-red-600">{errors.studentId.message}</p>
+              )}
+            </div>
+
+            <div>
+              <label htmlFor="courseId" className="block text-sm font-medium text-gray-700">
+                Course *
+              </label>
+              <select
+                {...register('courseId', { valueAsNumber: true })}
+                id="courseId"
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-3 py-2 border"
+              >
+                <option value="">Select a course</option>
+                {courses.map((course) => (
+                  <option key={course.id} value={course.id}>
+                    {course.name} - ₹{course.fee || 0}
+                  </option>
+                ))}
+              </select>
+              {errors.courseId && (
+                <p className="mt-1 text-sm text-red-600">{errors.courseId.message}</p>
+              )}
+            </div>
+
+            <div>
+              <label htmlFor="batchId" className="block text-sm font-medium text-gray-700">
+                Batch *
+              </label>
+              <select
+                {...register('batchId', { valueAsNumber: true })}
+                id="batchId"
+                disabled={!selectedCourse || batches.length === 0}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-3 py-2 border disabled:bg-gray-100"
+              >
+                <option value="">{selectedCourse ? 'Select a batch' : 'Select course first'}</option>
+                {batches.map((batch) => (
+                  <option key={batch.id} value={batch.id}>
+                    {batch.name} ({batch.currentStudents}/{batch.maxStudents} students)
+                  </option>
+                ))}
+              </select>
+              {errors.batchId && (
+                <p className="mt-1 text-sm text-red-600">{errors.batchId.message}</p>
+              )}
+            </div>
+
+            <div>
+              <label htmlFor="status" className="block text-sm font-medium text-gray-700">
+                Status
+              </label>
+              <select
+                {...register('status')}
+                id="status"
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-3 py-2 border"
+              >
+                <option value="Active">Active</option>
+                <option value="Completed">Completed</option>
+                <option value="Cancelled">Cancelled</option>
+              </select>
+            </div>
+
+            <div>
+              <label htmlFor="totalFee" className="block text-sm font-medium text-gray-700">
+                Total Fee (₹)
+              </label>
+              <input
+                {...register('totalFee', { valueAsNumber: true })}
+                type="number"
+                id="totalFee"
+                step="0.01"
+                min="0"
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-3 py-2 border"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="feePaid" className="block text-sm font-medium text-gray-700">
+                Fee Paid (₹)
+              </label>
+              <input
+                {...register('feePaid', { valueAsNumber: true })}
+                type="number"
+                id="feePaid"
+                step="0.01"
+                min="0"
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-3 py-2 border"
+              />
+            </div>
+          </div>
+
+          <div className="mt-6 flex justify-end space-x-3">
+            <button
+              type="button"
+              onClick={() => router.back()}
+              className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={loading}
+              className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
+            >
+              {loading ? 'Updating...' : 'Update Enrollment'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </AdminLayout>
+  );
+}
+

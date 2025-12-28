@@ -6,6 +6,7 @@ namespace CoachingManagementSystem.Application.Interfaces;
 public interface IApplicationDbContext
 {
     DbSet<Coaching> Coachings { get; }
+    DbSet<Branch> Branches { get; }
     DbSet<User> Users { get; }
     DbSet<Role> Roles { get; }
     DbSet<UserRole> UserRoles { get; }
@@ -22,6 +23,8 @@ public interface IApplicationDbContext
     DbSet<Plan> Plans { get; }
     DbSet<Subscription> Subscriptions { get; }
     DbSet<UsageLog> UsageLogs { get; }
+    DbSet<Qualification> Qualifications { get; }
+    DbSet<Specialization> Specializations { get; }
     
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

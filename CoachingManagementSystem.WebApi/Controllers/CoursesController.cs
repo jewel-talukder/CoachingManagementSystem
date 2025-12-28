@@ -5,6 +5,7 @@ using CoachingManagementSystem.Application.Features.Courses.Commands;
 using CoachingManagementSystem.Application.Features.Courses.Queries;
 using CoachingManagementSystem.Application.Features.Courses.DTOs;
 using CoachingManagementSystem.Application.Interfaces;
+using Microsoft.EntityFrameworkCore;
 
 namespace CoachingManagementSystem.WebApi.Controllers;
 
@@ -15,17 +16,20 @@ public class CoursesController : ControllerBase
 {
     private readonly CreateCourseCommandHandler _createHandler;
     private readonly GetAllCoursesQueryHandler _getAllHandler;
+    private readonly IApplicationDbContext _context;
 
     public CoursesController(
         CreateCourseCommandHandler createHandler,
-        GetAllCoursesQueryHandler getAllHandler)
+        GetAllCoursesQueryHandler getAllHandler,
+        IApplicationDbContext context)
     {
         _createHandler = createHandler;
         _getAllHandler = getAllHandler;
+        _context = context;
     }
 
     [HttpGet]
-    public async Task<ActionResult> GetAll([FromQuery] bool? isActive)
+    public async Task<ActionResult> GetAll([FromQuery] bool? isActive, [FromQuery] int? branchId)
     {
         var coachingId = GetCoachingId();
         if (coachingId == null)
@@ -34,6 +38,7 @@ public class CoursesController : ControllerBase
         var query = new GetAllCoursesQuery
         {
             CoachingId = coachingId.Value,
+            BranchId = branchId,
             IsActive = isActive
         };
 
@@ -47,16 +52,37 @@ public class CoursesController : ControllerBase
 
     [HttpPost]
     [Authorize(Roles = "Coaching Admin,Super Admin")]
-    public async Task<ActionResult> Create([FromBody] CreateCourseRequest request)
+    public async Task<ActionResult> Create([FromBody] CreateCourseRequest request, [FromQuery] int? branchId)
     {
         var coachingId = GetCoachingId();
         if (coachingId == null)
             return Unauthorized();
 
+        // Get branchId from query or use default branch
+        int finalBranchId;
+        if (branchId.HasValue)
+        {
+            finalBranchId = branchId.Value;
+        }
+        else
+        {
+            // Get default branch
+            var defaultBranch = await _context.Branches
+                .FirstOrDefaultAsync(b => b.CoachingId == coachingId.Value && b.IsDefault && !b.IsDeleted);
+            
+            if (defaultBranch == null)
+            {
+                return BadRequest(new { message = "No default branch found. Please specify a branchId." });
+            }
+            
+            finalBranchId = defaultBranch.Id;
+        }
+
         var command = new CreateCourseCommand
         {
             Request = request,
-            CoachingId = coachingId.Value
+            CoachingId = coachingId.Value,
+            BranchId = finalBranchId
         };
 
         var result = await _createHandler.Handle(command, CancellationToken.None);

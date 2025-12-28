@@ -8,6 +8,12 @@ import { useRouter } from 'next/navigation';
 import AdminLayout from '@/components/layouts/AdminLayout';
 import { batchesApi, coursesApi } from '@/lib/api';
 
+interface DaySchedule {
+  day: string;
+  startTime: string;
+  endTime: string;
+}
+
 const batchSchema = z.object({
   name: z.string().min(1, 'Batch name is required'),
   code: z.string().optional(),
@@ -24,10 +30,13 @@ const batchSchema = z.object({
 
 type BatchFormData = z.infer<typeof batchSchema>;
 
+const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
 export default function NewBatchPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [courses, setCourses] = useState<any[]>([]);
+  const [daySchedules, setDaySchedules] = useState<DaySchedule[]>([]);
   const router = useRouter();
 
   useEffect(() => {
@@ -51,17 +60,51 @@ export default function NewBatchPage() {
     resolver: zodResolver(batchSchema),
   });
 
+  const toggleDay = (day: string) => {
+    setDaySchedules(prev => {
+      const existing = prev.find(ds => ds.day === day);
+      if (existing) {
+        // Remove day
+        return prev.filter(ds => ds.day !== day);
+      } else {
+        // Add day with default times
+        return [...prev, { day, startTime: '09:00', endTime: '10:00' }];
+      }
+    });
+  };
+
+  const updateDaySchedule = (day: string, field: 'startTime' | 'endTime', value: string) => {
+    setDaySchedules(prev =>
+      prev.map(ds => ds.day === day ? { ...ds, [field]: value } : ds)
+    );
+  };
+
   const onSubmit = async (data: BatchFormData) => {
     setError(null);
     setLoading(true);
 
     try {
+      // Convert day schedules to JSON format
+      const scheduleDaysJson = daySchedules.length > 0 
+        ? JSON.stringify(daySchedules.map(ds => ({
+            day: ds.day,
+            startTime: ds.startTime + ':00', // Add seconds for backend
+            endTime: ds.endTime + ':00'
+          })))
+        : null;
+
       const batchData = {
         ...data,
         startDate: new Date(data.startDate).toISOString(),
         endDate: data.endDate ? new Date(data.endDate).toISOString() : null,
-        startTime: data.startTime || null,
-        endTime: data.endTime || null,
+        scheduleDays: scheduleDaysJson,
+        daySchedules: daySchedules.length > 0 ? daySchedules.map(ds => ({
+          day: ds.day,
+          startTime: ds.startTime + ':00',
+          endTime: ds.endTime + ':00'
+        })) : null,
+        startTime: null,
+        endTime: null,
       };
       await batchesApi.create(batchData);
       router.push('/admin/batches');
@@ -188,41 +231,64 @@ export default function NewBatchPage() {
               />
             </div>
 
-            <div>
-              <label htmlFor="startTime" className="block text-sm font-medium text-gray-700">
-                Start Time
-              </label>
-              <input
-                {...register('startTime')}
-                type="time"
-                id="startTime"
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-3 py-2 border"
-              />
-            </div>
-
-            <div>
-              <label htmlFor="endTime" className="block text-sm font-medium text-gray-700">
-                End Time
-              </label>
-              <input
-                {...register('endTime')}
-                type="time"
-                id="endTime"
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-3 py-2 border"
-              />
-            </div>
-
             <div className="sm:col-span-2">
-              <label htmlFor="scheduleDays" className="block text-sm font-medium text-gray-700">
-                Schedule Days (JSON array, e.g., ["Monday", "Wednesday", "Friday"])
+              <label className="block text-sm font-medium text-gray-700 mb-3">
+                Schedule Days & Times *
               </label>
-              <input
-                {...register('scheduleDays')}
-                type="text"
-                id="scheduleDays"
-                placeholder='["Monday", "Wednesday", "Friday"]'
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-3 py-2 border"
-              />
+              <div className="space-y-4">
+                {/* Day Selection Buttons */}
+                <div className="flex flex-wrap gap-2">
+                  {DAYS.map(day => {
+                    const isSelected = daySchedules.some(ds => ds.day === day);
+                    return (
+                      <button
+                        key={day}
+                        type="button"
+                        onClick={() => toggleDay(day)}
+                        className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                          isSelected
+                            ? 'bg-blue-600 text-white hover:bg-blue-700'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
+                      >
+                        {day}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Time Inputs for Selected Days */}
+                {daySchedules.length > 0 && (
+                  <div className="space-y-3 p-4 bg-gray-50 rounded-lg">
+                    <p className="text-sm font-medium text-gray-700 mb-3">
+                      Set times for selected days:
+                    </p>
+                    {daySchedules.map((schedule, index) => (
+                      <div key={schedule.day} className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-center">
+                        <div className="font-medium text-gray-700">{schedule.day}</div>
+                        <div>
+                          <label className="block text-xs text-gray-600 mb-1">Start Time</label>
+                          <input
+                            type="time"
+                            value={schedule.startTime}
+                            onChange={(e) => updateDaySchedule(schedule.day, 'startTime', e.target.value)}
+                            className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-3 py-2 border text-sm"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs text-gray-600 mb-1">End Time</label>
+                          <input
+                            type="time"
+                            value={schedule.endTime}
+                            onChange={(e) => updateDaySchedule(schedule.day, 'endTime', e.target.value)}
+                            className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-3 py-2 border text-sm"
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 

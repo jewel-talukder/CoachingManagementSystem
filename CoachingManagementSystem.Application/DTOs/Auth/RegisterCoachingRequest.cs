@@ -17,5 +17,8 @@ public class RegisterCoachingRequest
     public string AdminEmail { get; set; } = string.Empty;
     public string AdminPassword { get; set; } = string.Empty;
     public string? AdminPhone { get; set; }
+    
+    // Billing period selection (Monthly or Yearly)
+    public string BillingPeriod { get; set; } = "Monthly"; // Monthly, Yearly
 }
 

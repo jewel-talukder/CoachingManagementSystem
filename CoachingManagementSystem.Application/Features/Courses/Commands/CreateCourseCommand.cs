@@ -10,6 +10,7 @@ public class CreateCourseCommand
 {
     public CreateCourseRequest Request { get; set; } = null!;
     public int CoachingId { get; set; }
+    public int BranchId { get; set; }
 }
 
 public class CreateCourseCommandHandler
@@ -25,21 +26,22 @@ public class CreateCourseCommandHandler
     {
         try
         {
-            // Check if code already exists for this coaching
+            // Check if code already exists for this branch
             if (!string.IsNullOrEmpty(command.Request.Code))
             {
                 var codeExists = await _context.Courses
-                    .AnyAsync(c => c.CoachingId == command.CoachingId && c.Code == command.Request.Code && !c.IsDeleted, cancellationToken);
+                    .AnyAsync(c => c.BranchId == command.BranchId && c.Code == command.Request.Code && !c.IsDeleted, cancellationToken);
 
                 if (codeExists)
                 {
-                    return BaseResponse<CourseDto>.ErrorResponse("Course code already exists");
+                    return BaseResponse<CourseDto>.ErrorResponse("Course code already exists for this branch");
                 }
             }
 
             var course = new Course
             {
                 CoachingId = command.CoachingId,
+                BranchId = command.BranchId,
                 Name = command.Request.Name,
                 Description = command.Request.Description,
                 Code = command.Request.Code,

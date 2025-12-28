@@ -11,6 +11,7 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
     }
 
     public DbSet<Coaching> Coachings { get; set; }
+    public DbSet<Branch> Branches { get; set; }
     public DbSet<User> Users { get; set; }
     public DbSet<Role> Roles { get; set; }
     public DbSet<UserRole> UserRoles { get; set; }
@@ -27,6 +28,8 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<Plan> Plans { get; set; }
     public DbSet<Subscription> Subscriptions { get; set; }
     public DbSet<UsageLog> UsageLogs { get; set; }
+    public DbSet<Qualification> Qualifications { get; set; }
+    public DbSet<Specialization> Specializations { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -34,10 +37,11 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
 
         // Configure indexes for multi-tenancy
         modelBuilder.Entity<User>().HasIndex(u => new { u.CoachingId, u.Email }).IsUnique();
-        modelBuilder.Entity<Student>().HasIndex(s => new { s.CoachingId, s.StudentCode }).IsUnique();
-        modelBuilder.Entity<Teacher>().HasIndex(t => new { t.CoachingId, t.EmployeeCode }).IsUnique();
-        modelBuilder.Entity<Course>().HasIndex(c => new { c.CoachingId, c.Code }).IsUnique();
-        modelBuilder.Entity<Batch>().HasIndex(b => new { b.CoachingId, b.Code }).IsUnique();
+        modelBuilder.Entity<Branch>().HasIndex(b => new { b.CoachingId, b.Code }).IsUnique();
+        modelBuilder.Entity<Student>().HasIndex(s => new { s.BranchId, s.StudentCode }).IsUnique();
+        modelBuilder.Entity<Teacher>().HasIndex(t => new { t.BranchId, t.EmployeeCode }).IsUnique();
+        modelBuilder.Entity<Course>().HasIndex(c => new { c.BranchId, c.Code }).IsUnique();
+        modelBuilder.Entity<Batch>().HasIndex(b => new { b.BranchId, b.Code }).IsUnique();
 
         // Configure relationships
         modelBuilder.Entity<User>()
@@ -46,17 +50,59 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
             .HasForeignKey(u => u.CoachingId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        modelBuilder.Entity<Branch>()
+            .HasOne(b => b.Coaching)
+            .WithMany()
+            .HasForeignKey(b => b.CoachingId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         modelBuilder.Entity<Student>()
             .HasOne(s => s.User)
             .WithOne(u => u.Student)
             .HasForeignKey<Student>(s => s.UserId)
             .OnDelete(DeleteBehavior.Cascade);
 
+        modelBuilder.Entity<Student>()
+            .HasOne(s => s.Branch)
+            .WithMany(b => b.Students)
+            .HasForeignKey(s => s.BranchId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         modelBuilder.Entity<Teacher>()
             .HasOne(t => t.User)
             .WithOne(u => u.Teacher)
             .HasForeignKey<Teacher>(t => t.UserId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<Teacher>()
+            .HasOne(t => t.Branch)
+            .WithMany(b => b.Teachers)
+            .HasForeignKey(t => t.BranchId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<Teacher>()
+            .HasOne(t => t.Qualification)
+            .WithMany(q => q.Teachers)
+            .HasForeignKey(t => t.QualificationId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        modelBuilder.Entity<Teacher>()
+            .HasOne(t => t.Specialization)
+            .WithMany(s => s.Teachers)
+            .HasForeignKey(t => t.SpecializationId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        modelBuilder.Entity<Qualification>()
+            .HasOne(q => q.Coaching)
+            .WithMany()
+            .HasForeignKey(q => q.CoachingId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<Specialization>()
+            .HasOne(s => s.Coaching)
+            .WithMany()
+            .HasForeignKey(s => s.CoachingId)
+            .OnDelete(DeleteBehavior.Restrict);
 
         // Configure Subscription relationship (one-to-one)
         modelBuilder.Entity<Subscription>()
@@ -78,11 +124,23 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
             .HasForeignKey(c => c.CoachingId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        modelBuilder.Entity<Course>()
+            .HasOne(c => c.Branch)
+            .WithMany(b => b.Courses)
+            .HasForeignKey(c => c.BranchId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         // Configure Batch relationships to avoid cascade conflicts
         modelBuilder.Entity<Batch>()
             .HasOne(b => b.Coaching)
             .WithMany(c => c.Batches)
             .HasForeignKey(b => b.CoachingId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<Batch>()
+            .HasOne(b => b.Branch)
+            .WithMany(br => br.Batches)
+            .HasForeignKey(b => b.BranchId)
             .OnDelete(DeleteBehavior.Restrict);
 
         modelBuilder.Entity<Batch>()
@@ -108,6 +166,12 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
             .HasOne(e => e.Coaching)
             .WithMany()
             .HasForeignKey(e => e.CoachingId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<Enrollment>()
+            .HasOne(e => e.Branch)
+            .WithMany(b => b.Enrollments)
+            .HasForeignKey(e => e.BranchId)
             .OnDelete(DeleteBehavior.Restrict);
 
         modelBuilder.Entity<Enrollment>()
@@ -196,6 +260,7 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
 
         // Soft delete filter
         modelBuilder.Entity<Coaching>().HasQueryFilter(c => !c.IsDeleted);
+        modelBuilder.Entity<Branch>().HasQueryFilter(b => !b.IsDeleted);
         modelBuilder.Entity<User>().HasQueryFilter(u => !u.IsDeleted);
         modelBuilder.Entity<Student>().HasQueryFilter(s => !s.IsDeleted);
         modelBuilder.Entity<Teacher>().HasQueryFilter(t => !t.IsDeleted);
@@ -203,6 +268,8 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
         modelBuilder.Entity<Batch>().HasQueryFilter(b => !b.IsDeleted);
         modelBuilder.Entity<Exam>().HasQueryFilter(e => !e.IsDeleted);
         modelBuilder.Entity<Plan>().HasQueryFilter(p => !p.IsDeleted);
+        modelBuilder.Entity<Qualification>().HasQueryFilter(q => !q.IsDeleted);
+        modelBuilder.Entity<Specialization>().HasQueryFilter(s => !s.IsDeleted);
     }
 }
 

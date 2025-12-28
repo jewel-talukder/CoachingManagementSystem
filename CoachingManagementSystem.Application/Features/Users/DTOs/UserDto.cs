@@ -31,5 +31,7 @@ public class UpdateUserRequest
     public string? Phone { get; set; }
     public bool IsActive { get; set; }
     public List<int> RoleIds { get; set; } = new();
+    public string? UserType { get; set; } // "Teacher" or "Student"
+    public Dictionary<string, object>? AdditionalData { get; set; } // For Teacher/Student specific fields
 }
 

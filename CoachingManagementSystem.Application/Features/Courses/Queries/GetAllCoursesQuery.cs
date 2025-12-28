@@ -8,6 +8,7 @@ namespace CoachingManagementSystem.Application.Features.Courses.Queries;
 public class GetAllCoursesQuery
 {
     public int CoachingId { get; set; }
+    public int? BranchId { get; set; }
     public bool? IsActive { get; set; }
 }
 
@@ -28,6 +29,11 @@ public class GetAllCoursesQueryHandler
                 .Include(c => c.Teacher)
                     .ThenInclude(t => t!.User)
                 .Where(c => c.CoachingId == query.CoachingId && !c.IsDeleted);
+
+            if (query.BranchId.HasValue)
+            {
+                coursesQuery = coursesQuery.Where(c => c.BranchId == query.BranchId.Value);
+            }
 
             if (query.IsActive.HasValue)
             {

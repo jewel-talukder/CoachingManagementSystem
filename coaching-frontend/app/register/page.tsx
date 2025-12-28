@@ -1,11 +1,24 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { authApi } from "@/lib/api";
 import { useAuthStore } from "@/lib/store/authStore";
 import { useToastStore } from "@/lib/store/toastStore";
+
+interface Plan {
+  id: number;
+  name: string;
+  description: string | null;
+  price: number;
+  billingPeriod: string;
+  trialDays: number;
+  maxUsers: number | null;
+  maxCourses: number | null;
+  maxStudents: number | null;
+  maxTeachers: number | null;
+}
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -26,11 +39,29 @@ export default function RegisterPage() {
     state: "",
     zipCode: "",
     country: "",
+    billingPeriod: "Monthly", // Monthly or Yearly
   });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [plan, setPlan] = useState<Plan | null>(null);
+  const [loadingPlan, setLoadingPlan] = useState(true);
+
+  useEffect(() => {
+    const fetchPlan = async () => {
+      setLoadingPlan(true);
+      try {
+        const response = await authApi.getFirstPlan(formData.billingPeriod);
+        setPlan(response.data);
+      } catch (err) {
+        console.error("Failed to fetch plan:", err);
+      } finally {
+        setLoadingPlan(false);
+      }
+    };
+    fetchPlan();
+  }, [formData.billingPeriod]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -81,17 +112,21 @@ export default function RegisterPage() {
         adminEmail: formData.adminEmail,
         adminPassword: formData.password,
         adminPhone: formData.adminPhone || null,
+        billingPeriod: formData.billingPeriod,
       };
 
       // Call registration API
       const response = await authApi.registerCoaching(registrationData);
-      const { token, user } = response.data;
+      const { token, user, plan: assignedPlan } = response.data;
 
       // Store authentication data (auto-login)
       setAuth(user, token);
 
-      // Show success message
-      addToast("Registration successful! Welcome to Coaching Sheba!", "success");
+      // Show success message with plan information
+      const planMessage = assignedPlan
+        ? `Registration successful! You've been assigned the ${assignedPlan.name} plan${assignedPlan.trialDays > 0 ? ` with ${assignedPlan.trialDays} days free trial` : ""}.`
+        : "Registration successful! Welcome to Coaching Sheba!";
+      addToast(planMessage, "success");
 
       // Redirect to admin dashboard after successful registration
       setTimeout(() => {
@@ -124,6 +159,96 @@ export default function RegisterPage() {
         <div className="bg-white rounded-2xl shadow-xl p-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Create Account</h1>
           <p className="text-gray-600 mb-8">Register your coaching center to get started</p>
+
+          {/* Billing Period Selection */}
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-gray-700 mb-3">
+              Select Billing Period
+            </label>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setFormData({ ...formData, billingPeriod: "Monthly" })}
+                className={`px-4 py-3 rounded-lg border-2 transition-all ${
+                  formData.billingPeriod === "Monthly"
+                    ? "border-blue-600 bg-blue-50 text-blue-700 font-semibold"
+                    : "border-gray-300 bg-white text-gray-700 hover:border-gray-400"
+                }`}
+              >
+                <div className="text-center">
+                  <div className="font-semibold">Monthly</div>
+                  <div className="text-xs text-gray-500 mt-1">Pay monthly</div>
+                </div>
+              </button>
+              <button
+                type="button"
+                onClick={() => setFormData({ ...formData, billingPeriod: "Yearly" })}
+                className={`px-4 py-3 rounded-lg border-2 transition-all ${
+                  formData.billingPeriod === "Yearly"
+                    ? "border-blue-600 bg-blue-50 text-blue-700 font-semibold"
+                    : "border-gray-300 bg-white text-gray-700 hover:border-gray-400"
+                }`}
+              >
+                <div className="text-center">
+                  <div className="font-semibold">Yearly</div>
+                  <div className="text-xs text-gray-500 mt-1">Pay annually</div>
+                </div>
+              </button>
+            </div>
+          </div>
+
+          {/* Plan Information Card */}
+          {loadingPlan && (
+            <div className="mb-6 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+              <div className="animate-pulse">
+                <div className="h-4 bg-gray-300 rounded w-1/3 mb-2"></div>
+                <div className="h-3 bg-gray-300 rounded w-2/3"></div>
+              </div>
+            </div>
+          )}
+          {!loadingPlan && plan && (
+            <div className="mb-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg">
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-1">{plan.name}</h3>
+                  {plan.description && (
+                    <p className="text-sm text-gray-600 mb-2">{plan.description}</p>
+                  )}
+                  <div className="flex items-center gap-4 text-sm text-gray-700">
+                    <span className="font-semibold">
+                      {plan.price === 0 ? (
+                        <span className="text-green-600">Free</span>
+                      ) : (
+                        `$${plan.price.toFixed(2)}/${plan.billingPeriod}`
+                      )}
+                    </span>
+                    {plan.trialDays > 0 && (
+                      <span className="px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-medium">
+                        {plan.trialDays} days free trial
+                      </span>
+                    )}
+                  </div>
+                  <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-gray-600">
+                    {plan.maxUsers && (
+                      <span>Max Users: {plan.maxUsers}</span>
+                    )}
+                    {plan.maxCourses && (
+                      <span>Max Courses: {plan.maxCourses}</span>
+                    )}
+                    {plan.maxStudents && (
+                      <span>Max Students: {plan.maxStudents}</span>
+                    )}
+                    {plan.maxTeachers && (
+                      <span>Max Teachers: {plan.maxTeachers}</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <p className="mt-3 text-xs text-gray-500 italic">
+                This plan will be automatically assigned upon registration
+              </p>
+            </div>
+          )}
 
           {error && (
             <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">

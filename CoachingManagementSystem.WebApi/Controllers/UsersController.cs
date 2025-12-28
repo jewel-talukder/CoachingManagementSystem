@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using CoachingManagementSystem.Application.Features.Users.DTOs;
 using CoachingManagementSystem.Application.Interfaces;
 using CoachingManagementSystem.Domain.Entities;
+using CoachingManagementSystem.Domain.Enums;
 using BCrypt.Net;
 
 namespace CoachingManagementSystem.WebApi.Controllers;
@@ -23,7 +24,7 @@ public class UsersController : ControllerBase
 
     [HttpGet]
     [Authorize(Roles = "Coaching Admin,Super Admin")]
-    public async Task<ActionResult> GetAll([FromQuery] string? role, [FromQuery] bool? isActive)
+    public async Task<ActionResult> GetAll([FromQuery] string? role, [FromQuery] bool? isActive, [FromQuery] int? branchId)
     {
         var coachingId = GetCoachingId();
         if (coachingId == null)
@@ -33,6 +34,27 @@ public class UsersController : ControllerBase
             .Include(u => u.UserRoles)
                 .ThenInclude(ur => ur.Role)
             .Where(u => u.CoachingId == coachingId.Value && !u.IsDeleted);
+
+        // Filter by branch if specified (for Students and Teachers)
+        if (branchId.HasValue)
+        {
+            if (role == "Student")
+            {
+                var studentUserIds = await _context.Students
+                    .Where(s => s.BranchId == branchId.Value && s.CoachingId == coachingId.Value && !s.IsDeleted)
+                    .Select(s => s.UserId)
+                    .ToListAsync();
+                usersQuery = usersQuery.Where(u => studentUserIds.Contains(u.Id));
+            }
+            else if (role == "Teacher")
+            {
+                var teacherUserIds = await _context.Teachers
+                    .Where(t => t.BranchId == branchId.Value && t.CoachingId == coachingId.Value && !t.IsDeleted)
+                    .Select(t => t.UserId)
+                    .ToListAsync();
+                usersQuery = usersQuery.Where(u => teacherUserIds.Contains(u.Id));
+            }
+        }
 
         if (!string.IsNullOrEmpty(role))
         {
@@ -88,6 +110,26 @@ public class UsersController : ControllerBase
             return BadRequest(new { message = "One or more roles not found" });
         }
 
+        // Get branchId from request or use default branch
+        int? branchId = null;
+        if (request.AdditionalData?.ContainsKey("BranchId") == true && request.AdditionalData["BranchId"] != null)
+        {
+            branchId = Convert.ToInt32(request.AdditionalData["BranchId"]);
+        }
+        else
+        {
+            // Get default branch
+            var defaultBranch = await _context.Branches
+                .FirstOrDefaultAsync(b => b.CoachingId == coachingId.Value && b.IsDefault && !b.IsDeleted);
+            if (defaultBranch != null)
+                branchId = defaultBranch.Id;
+        }
+
+        if (!branchId.HasValue)
+        {
+            return BadRequest(new { message = "Branch is required" });
+        }
+
         // Create user
         var user = new User
         {
@@ -117,19 +159,42 @@ public class UsersController : ControllerBase
         // Create Teacher or Student record if needed
         if (request.UserType == "Teacher")
         {
+            EmploymentType employmentType = EmploymentType.FullTime;
+            if (request.AdditionalData?.ContainsKey("EmploymentType") == true)
+            {
+                var empTypeStr = request.AdditionalData["EmploymentType"]?.ToString();
+                if (Enum.TryParse<EmploymentType>(empTypeStr, out var empType))
+                {
+                    employmentType = empType;
+                }
+            }
+
+            decimal? salary = null;
+            if (request.AdditionalData?.ContainsKey("Salary") == true)
+            {
+                var salaryStr = request.AdditionalData["Salary"]?.ToString();
+                if (decimal.TryParse(salaryStr, out var salaryValue))
+                {
+                    salary = salaryValue;
+                }
+            }
+
             var teacher = new Teacher
             {
                 CoachingId = coachingId.Value,
+                BranchId = branchId.Value,
                 UserId = user.Id,
                 EmployeeCode = request.AdditionalData?.ContainsKey("EmployeeCode") == true 
                     ? request.AdditionalData["EmployeeCode"]?.ToString() 
                     : null,
-                Qualification = request.AdditionalData?.ContainsKey("Qualification") == true 
-                    ? request.AdditionalData["Qualification"]?.ToString() 
+                QualificationId = request.AdditionalData?.ContainsKey("QualificationId") == true 
+                    ? (int.TryParse(request.AdditionalData["QualificationId"]?.ToString(), out var qualId) && qualId > 0 ? qualId : (int?)null)
                     : null,
-                Specialization = request.AdditionalData?.ContainsKey("Specialization") == true 
-                    ? request.AdditionalData["Specialization"]?.ToString() 
-                    : null
+                SpecializationId = request.AdditionalData?.ContainsKey("SpecializationId") == true 
+                    ? (int.TryParse(request.AdditionalData["SpecializationId"]?.ToString(), out var specId) && specId > 0 ? specId : (int?)null)
+                    : null,
+                EmploymentType = employmentType,
+                Salary = salary
             };
             _context.Teachers.Add(teacher);
         }
@@ -138,6 +203,7 @@ public class UsersController : ControllerBase
             var student = new Student
             {
                 CoachingId = coachingId.Value,
+                BranchId = branchId.Value,
                 UserId = user.Id,
                 StudentCode = request.AdditionalData?.ContainsKey("StudentCode") == true 
                     ? request.AdditionalData["StudentCode"]?.ToString() 
@@ -158,6 +224,63 @@ public class UsersController : ControllerBase
         await _context.SaveChangesAsync();
 
         return CreatedAtAction(nameof(GetAll), new { id = user.Id }, user);
+    }
+
+    [HttpGet("{id}")]
+    [Authorize(Roles = "Coaching Admin,Super Admin")]
+    public async Task<ActionResult> GetById(int id)
+    {
+        var coachingId = GetCoachingId();
+        if (coachingId == null)
+            return Unauthorized();
+
+        var user = await _context.Users
+            .Include(u => u.UserRoles)
+                .ThenInclude(ur => ur.Role)
+            .FirstOrDefaultAsync(u => u.Id == id && u.CoachingId == coachingId.Value && !u.IsDeleted);
+
+        if (user == null)
+            return NotFound(new { message = "User not found" });
+
+        // Get Student or Teacher data if exists
+        var student = await _context.Students
+            .FirstOrDefaultAsync(s => s.UserId == id && s.CoachingId == coachingId.Value && !s.IsDeleted);
+
+        var teacher = await _context.Teachers
+            .FirstOrDefaultAsync(t => t.UserId == id && t.CoachingId == coachingId.Value && !t.IsDeleted);
+
+        var userDto = new
+        {
+            Id = user.Id,
+            FirstName = user.FirstName,
+            LastName = user.LastName,
+            Email = user.Email,
+            Phone = user.Phone,
+            Roles = user.UserRoles.Select(ur => ur.Role.Name).ToList(),
+            RoleIds = user.UserRoles.Select(ur => ur.Role.Id).ToList(),
+            IsActive = user.IsActive,
+            UserType = student != null ? "Student" : teacher != null ? "Teacher" : null,
+            AdditionalData = student != null ? new Dictionary<string, object>
+            {
+                ["StudentCode"] = student.StudentCode ?? string.Empty,
+                ["DateOfBirth"] = student.DateOfBirth?.ToString("yyyy-MM-dd") ?? string.Empty,
+                ["ParentName"] = student.ParentName ?? string.Empty,
+                ["ParentPhone"] = student.ParentPhone ?? string.Empty,
+                ["Address"] = student.Address ?? string.Empty
+            } : teacher != null ? new Dictionary<string, object>
+            {
+                ["EmployeeCode"] = teacher.EmployeeCode ?? string.Empty,
+                ["QualificationId"] = teacher.QualificationId?.ToString() ?? string.Empty,
+                ["QualificationName"] = teacher.Qualification?.Name ?? string.Empty,
+                ["SpecializationId"] = teacher.SpecializationId?.ToString() ?? string.Empty,
+                ["SpecializationName"] = teacher.Specialization?.Name ?? string.Empty,
+                ["EmploymentType"] = ((int)teacher.EmploymentType).ToString(),
+                ["EmploymentTypeName"] = teacher.EmploymentType.ToString(),
+                ["Salary"] = teacher.Salary?.ToString() ?? string.Empty
+            } : null
+        };
+
+        return Ok(userDto);
     }
 
     [HttpPut("{id}")]
@@ -201,9 +324,140 @@ public class UsersController : ControllerBase
             _context.UserRoles.Add(userRole);
         }
 
+        // Update Student or Teacher record if needed
+        if (request.UserType == "Student" && request.AdditionalData != null)
+        {
+            var student = await _context.Students
+                .FirstOrDefaultAsync(s => s.UserId == id && s.CoachingId == coachingId.Value && !s.IsDeleted);
+
+            if (student != null)
+            {
+                student.StudentCode = request.AdditionalData.ContainsKey("StudentCode") 
+                    ? request.AdditionalData["StudentCode"]?.ToString() 
+                    : student.StudentCode;
+                student.DateOfBirth = request.AdditionalData.ContainsKey("DateOfBirth") && 
+                    !string.IsNullOrEmpty(request.AdditionalData["DateOfBirth"]?.ToString())
+                    ? DateTime.Parse(request.AdditionalData["DateOfBirth"]!.ToString()!) 
+                    : student.DateOfBirth;
+                student.ParentName = request.AdditionalData.ContainsKey("ParentName") 
+                    ? request.AdditionalData["ParentName"]?.ToString() 
+                    : student.ParentName;
+                student.ParentPhone = request.AdditionalData.ContainsKey("ParentPhone") 
+                    ? request.AdditionalData["ParentPhone"]?.ToString() 
+                    : student.ParentPhone;
+                student.Address = request.AdditionalData.ContainsKey("Address") 
+                    ? request.AdditionalData["Address"]?.ToString() 
+                    : student.Address;
+                student.UpdatedAt = DateTime.UtcNow;
+            }
+        }
+        else if (request.UserType == "Teacher" && request.AdditionalData != null)
+        {
+            var teacher = await _context.Teachers
+                .FirstOrDefaultAsync(t => t.UserId == id && t.CoachingId == coachingId.Value && !t.IsDeleted);
+
+            if (teacher != null)
+            {
+                teacher.EmployeeCode = request.AdditionalData.ContainsKey("EmployeeCode") 
+                    ? request.AdditionalData["EmployeeCode"]?.ToString() 
+                    : teacher.EmployeeCode;
+                if (request.AdditionalData.ContainsKey("QualificationId"))
+                {
+                    var qualIdStr = request.AdditionalData["QualificationId"]?.ToString();
+                    if (int.TryParse(qualIdStr, out var qualId) && qualId > 0)
+                    {
+                        var qualification = await _context.Qualifications
+                            .FirstOrDefaultAsync(q => q.Id == qualId && q.CoachingId == coachingId.Value && !q.IsDeleted);
+                        teacher.QualificationId = qualification != null ? qualification.Id : null;
+                    }
+                    else
+                    {
+                        teacher.QualificationId = null;
+                    }
+                }
+                if (request.AdditionalData.ContainsKey("SpecializationId"))
+                {
+                    var specIdStr = request.AdditionalData["SpecializationId"]?.ToString();
+                    if (int.TryParse(specIdStr, out var specId) && specId > 0)
+                    {
+                        var specialization = await _context.Specializations
+                            .FirstOrDefaultAsync(s => s.Id == specId && s.CoachingId == coachingId.Value && !s.IsDeleted);
+                        teacher.SpecializationId = specialization != null ? specialization.Id : null;
+                    }
+                    else
+                    {
+                        teacher.SpecializationId = null;
+                    }
+                }
+                if (request.AdditionalData.ContainsKey("EmploymentType"))
+                {
+                    var empTypeStr = request.AdditionalData["EmploymentType"]?.ToString();
+                    if (Enum.TryParse<EmploymentType>(empTypeStr, out var empType))
+                    {
+                        teacher.EmploymentType = empType;
+                    }
+                }
+                if (request.AdditionalData.ContainsKey("Salary"))
+                {
+                    var salaryStr = request.AdditionalData["Salary"]?.ToString();
+                    if (decimal.TryParse(salaryStr, out var salaryValue))
+                    {
+                        teacher.Salary = salaryValue;
+                    }
+                    else if (string.IsNullOrEmpty(salaryStr))
+                    {
+                        teacher.Salary = null;
+                    }
+                }
+                teacher.UpdatedAt = DateTime.UtcNow;
+            }
+        }
+
         await _context.SaveChangesAsync();
 
         return Ok(new { message = "User updated successfully" });
+    }
+
+    [HttpDelete("{id}")]
+    [Authorize(Roles = "Coaching Admin,Super Admin")]
+    public async Task<ActionResult> Delete(int id)
+    {
+        var coachingId = GetCoachingId();
+        if (coachingId == null)
+            return Unauthorized();
+
+        var user = await _context.Users
+            .FirstOrDefaultAsync(u => u.Id == id && u.CoachingId == coachingId.Value && !u.IsDeleted);
+
+        if (user == null)
+            return NotFound(new { message = "User not found" });
+
+        // Soft delete user
+        user.IsDeleted = true;
+        user.UpdatedAt = DateTime.UtcNow;
+
+        // Soft delete associated Student or Teacher record
+        var student = await _context.Students
+            .FirstOrDefaultAsync(s => s.UserId == id && s.CoachingId == coachingId.Value && !s.IsDeleted);
+        
+        if (student != null)
+        {
+            student.IsDeleted = true;
+            student.UpdatedAt = DateTime.UtcNow;
+        }
+
+        var teacher = await _context.Teachers
+            .FirstOrDefaultAsync(t => t.UserId == id && t.CoachingId == coachingId.Value && !t.IsDeleted);
+        
+        if (teacher != null)
+        {
+            teacher.IsDeleted = true;
+            teacher.UpdatedAt = DateTime.UtcNow;
+        }
+
+        await _context.SaveChangesAsync();
+
+        return Ok(new { message = "User deleted successfully" });
     }
 
     private int? GetCoachingId()

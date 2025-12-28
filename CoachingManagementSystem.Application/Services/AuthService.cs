@@ -92,6 +92,35 @@ public class AuthService : IAuthService
         _context.Coachings.Add(coaching);
         await _context.SaveChangesAsync();
 
+        // Create default branch with coaching name
+        var defaultBranch = new Branch
+        {
+            CoachingId = coaching.Id,
+            Name = request.CoachingName, // Use coaching name as branch name
+            Code = "MAIN", // Default code
+            Address = request.Address,
+            City = request.City,
+            State = request.State,
+            ZipCode = request.ZipCode,
+            Country = request.Country,
+            Phone = request.Phone,
+            Email = request.Email,
+            IsActive = true,
+            IsDefault = true
+        };
+
+        _context.Branches.Add(defaultBranch);
+        try
+        {
+            await _context.SaveChangesAsync();
+        }
+        catch (Exception ex)
+        {
+            // If branch creation fails, it might be because migration hasn't been run
+            // Log the error and rethrow with more context
+            throw new InvalidOperationException($"Failed to create default branch. Please ensure database migrations have been run. Error: {ex.Message}", ex);
+        }
+
         // Get Coaching Admin role
         var adminRole = await _context.Roles.FirstOrDefaultAsync(r => r.Name == "Coaching Admin");
         if (adminRole == null)
@@ -126,6 +155,77 @@ public class AuthService : IAuthService
         _context.UserRoles.Add(userRole);
         await _context.SaveChangesAsync();
 
+        // Get the first active plan matching the selected billing period
+        var firstPlan = await _context.Plans
+            .Where(p => p.IsActive && !p.IsDeleted && p.BillingPeriod == request.BillingPeriod)
+            .OrderBy(p => p.Id)
+            .FirstOrDefaultAsync();
+        
+        // If no plan found for selected billing period, fallback to Monthly
+        if (firstPlan == null && request.BillingPeriod != "Monthly")
+        {
+            firstPlan = await _context.Plans
+                .Where(p => p.IsActive && !p.IsDeleted && p.BillingPeriod == "Monthly")
+                .OrderBy(p => p.Id)
+                .FirstOrDefaultAsync();
+        }
+
+        PlanDto? planDto = null;
+        if (firstPlan != null)
+        {
+            // Create subscription for the new coaching with the first plan
+            var startDate = DateTime.UtcNow;
+            DateTime endDate;
+            if (firstPlan.TrialDays > 0)
+            {
+                endDate = startDate.AddDays(firstPlan.TrialDays);
+            }
+            else
+            {
+                // Calculate end date based on billing period
+                endDate = firstPlan.BillingPeriod == "Yearly" 
+                    ? startDate.AddYears(1) 
+                    : startDate.AddMonths(1);
+            }
+            DateTime? trialEndDate = firstPlan.TrialDays > 0 ? endDate : null;
+
+            var subscription = new Subscription
+            {
+                CoachingId = coaching.Id,
+                PlanId = firstPlan.Id,
+                StartDate = startDate,
+                EndDate = endDate,
+                TrialEndDate = trialEndDate,
+                Status = firstPlan.TrialDays > 0 ? "Trial" : "Active",
+                Amount = firstPlan.Price,
+                AutoRenew = false
+            };
+
+            _context.Subscriptions.Add(subscription);
+            await _context.SaveChangesAsync();
+
+            // Update coaching with subscription
+            coaching.SubscriptionId = subscription.Id;
+            coaching.PlanId = firstPlan.Id;
+            coaching.SubscriptionExpiresAt = endDate;
+            await _context.SaveChangesAsync();
+
+            // Map plan to DTO
+            planDto = new PlanDto
+            {
+                Id = firstPlan.Id,
+                Name = firstPlan.Name,
+                Description = firstPlan.Description,
+                Price = firstPlan.Price,
+                BillingPeriod = firstPlan.BillingPeriod,
+                TrialDays = firstPlan.TrialDays,
+                MaxUsers = firstPlan.MaxUsers,
+                MaxCourses = firstPlan.MaxCourses,
+                MaxStudents = firstPlan.MaxStudents,
+                MaxTeachers = firstPlan.MaxTeachers
+            };
+        }
+
         // Generate token
         var roles = new List<string> { adminRole.Name };
         var token = _jwtService.GenerateToken(adminUser, roles, coaching.Id);
@@ -145,7 +245,8 @@ public class AuthService : IAuthService
                 Phone = adminUser.Phone,
                 Roles = roles
             },
-            ExpiresAt = DateTime.UtcNow.AddHours(24)
+            ExpiresAt = DateTime.UtcNow.AddHours(24),
+            Plan = planDto
         };
     }
 

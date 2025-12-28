@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
 using Microsoft.EntityFrameworkCore;
+using System.Text.Json;
 using CoachingManagementSystem.Application.Features.Batches.DTOs;
 using CoachingManagementSystem.Application.Interfaces;
 using CoachingManagementSystem.Domain.Entities;
@@ -21,7 +22,7 @@ public class BatchesController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<ActionResult> GetAll([FromQuery] int? courseId, [FromQuery] bool? isActive)
+    public async Task<ActionResult> GetAll([FromQuery] int? courseId, [FromQuery] bool? isActive, [FromQuery] int? branchId)
     {
         var coachingId = GetCoachingId();
         if (coachingId == null)
@@ -32,6 +33,9 @@ public class BatchesController : ControllerBase
             .Include(b => b.Teacher)
                 .ThenInclude(t => t!.User)
             .Where(b => b.CoachingId == coachingId.Value && !b.IsDeleted);
+
+        if (branchId.HasValue)
+            batchesQuery = batchesQuery.Where(b => b.BranchId == branchId.Value);
 
         if (courseId.HasValue)
             batchesQuery = batchesQuery.Where(b => b.CourseId == courseId.Value);
@@ -72,16 +76,49 @@ public class BatchesController : ControllerBase
         if (coachingId == null)
             return Unauthorized();
 
-        // Verify course exists and belongs to this coaching
+        // Get branchId from query or use default branch
+        int? branchId = null;
+        if (Request.Query.ContainsKey("branchId") && int.TryParse(Request.Query["branchId"], out var parsedBranchId))
+        {
+            branchId = parsedBranchId;
+        }
+        else
+        {
+            // Get default branch
+            var defaultBranch = await _context.Branches
+                .FirstOrDefaultAsync(b => b.CoachingId == coachingId.Value && b.IsDefault && !b.IsDeleted);
+            if (defaultBranch != null)
+                branchId = defaultBranch.Id;
+        }
+
+        if (!branchId.HasValue)
+        {
+            return BadRequest(new { message = "Branch is required" });
+        }
+
+        // Verify course exists and belongs to this branch
         var course = await _context.Courses
-            .FirstOrDefaultAsync(c => c.Id == request.CourseId && c.CoachingId == coachingId.Value && !c.IsDeleted);
+            .FirstOrDefaultAsync(c => c.Id == request.CourseId && c.CoachingId == coachingId.Value && c.BranchId == branchId.Value && !c.IsDeleted);
 
         if (course == null)
             return NotFound(new { message = "Course not found" });
 
+        // Convert DaySchedules to JSON string if provided
+        string? scheduleDaysJson = request.ScheduleDays;
+        if (request.DaySchedules != null && request.DaySchedules.Any())
+        {
+            scheduleDaysJson = JsonSerializer.Serialize(request.DaySchedules);
+        }
+        else if (string.IsNullOrEmpty(scheduleDaysJson) && (request.StartTime.HasValue || request.EndTime.HasValue))
+        {
+            // Legacy support: convert old StartTime/EndTime to new format if ScheduleDays is not provided
+            // This is a fallback for backward compatibility
+        }
+
         var batch = new Batch
         {
             CoachingId = coachingId.Value,
+            BranchId = branchId.Value,
             Name = request.Name,
             Code = request.Code,
             Description = request.Description,
@@ -90,7 +127,7 @@ public class BatchesController : ControllerBase
             StartDate = request.StartDate,
             EndDate = request.EndDate,
             MaxStudents = request.MaxStudents,
-            ScheduleDays = request.ScheduleDays,
+            ScheduleDays = scheduleDaysJson,
             StartTime = request.StartTime,
             EndTime = request.EndTime,
             IsActive = true,

@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
 using Microsoft.EntityFrameworkCore;
 using CoachingManagementSystem.Application.Interfaces;
+using CoachingManagementSystem.Application.Features.Enrollments.DTOs;
 using CoachingManagementSystem.Domain.Entities;
 
 namespace CoachingManagementSystem.WebApi.Controllers;
@@ -47,7 +48,7 @@ public class EnrollmentsController : ControllerBase
             enrollmentsQuery = enrollmentsQuery.Where(e => e.Status == status);
 
         var enrollments = await enrollmentsQuery
-            .Select(e => new
+            .Select(e => new EnrollmentDto
             {
                 Id = e.Id,
                 StudentId = e.StudentId,
@@ -67,6 +68,43 @@ public class EnrollmentsController : ControllerBase
         return Ok(enrollments);
     }
 
+    [HttpGet("{id}")]
+    [Authorize(Roles = "Coaching Admin,Super Admin")]
+    public async Task<ActionResult<EnrollmentDto>> GetById(int id)
+    {
+        var coachingId = GetCoachingId();
+        if (coachingId == null)
+            return Unauthorized();
+
+        var enrollment = await _context.Enrollments
+            .Include(e => e.Student)
+                .ThenInclude(s => s.User)
+            .Include(e => e.Course)
+            .Include(e => e.Batch)
+            .Where(e => e.Id == id && e.CoachingId == coachingId.Value)
+            .Select(e => new EnrollmentDto
+            {
+                Id = e.Id,
+                StudentId = e.StudentId,
+                StudentName = $"{e.Student.User.FirstName} {e.Student.User.LastName}",
+                CourseId = e.CourseId,
+                CourseName = e.Course.Name,
+                BatchId = e.BatchId,
+                BatchName = e.Batch.Name,
+                EnrollmentDate = e.EnrollmentDate,
+                CompletionDate = e.CompletionDate,
+                Status = e.Status,
+                FeePaid = e.FeePaid,
+                TotalFee = e.TotalFee
+            })
+            .FirstOrDefaultAsync();
+
+        if (enrollment == null)
+            return NotFound(new { message = "Enrollment not found" });
+
+        return Ok(enrollment);
+    }
+
     [HttpPost]
     [Authorize(Roles = "Coaching Admin,Super Admin")]
     public async Task<ActionResult> Create([FromBody] CreateEnrollmentRequest request)
@@ -74,6 +112,23 @@ public class EnrollmentsController : ControllerBase
         var coachingId = GetCoachingId();
         if (coachingId == null)
             return Unauthorized();
+
+        // Get branchId from query or use default branch
+        int? branchId = null;
+        if (Request.Query.ContainsKey("branchId") && int.TryParse(Request.Query["branchId"], out var parsedBranchId))
+        {
+            branchId = parsedBranchId;
+        }
+        else
+        {
+            var defaultBranch = await _context.Branches
+                .FirstOrDefaultAsync(b => b.CoachingId == coachingId.Value && b.IsDefault && !b.IsDeleted);
+            if (defaultBranch != null)
+                branchId = defaultBranch.Id;
+        }
+
+        if (!branchId.HasValue)
+            return BadRequest(new { message = "Branch is required" });
 
         // Verify student exists
         var student = await _context.Students
@@ -111,6 +166,7 @@ public class EnrollmentsController : ControllerBase
         var enrollment = new Enrollment
         {
             CoachingId = coachingId.Value,
+            BranchId = branchId.Value,
             StudentId = request.StudentId,
             CourseId = request.CourseId,
             BatchId = request.BatchId,
@@ -128,7 +184,125 @@ public class EnrollmentsController : ControllerBase
 
         await _context.SaveChangesAsync();
 
-        return CreatedAtAction(nameof(GetAll), new { id = enrollment.Id }, enrollment);
+        return CreatedAtAction(nameof(GetById), new { id = enrollment.Id }, enrollment);
+    }
+
+    [HttpPut("{id}")]
+    [Authorize(Roles = "Coaching Admin,Super Admin")]
+    public async Task<ActionResult> Update(int id, [FromBody] UpdateEnrollmentRequest request)
+    {
+        var coachingId = GetCoachingId();
+        if (coachingId == null)
+            return Unauthorized();
+
+        var enrollment = await _context.Enrollments
+            .Include(e => e.Batch)
+            .FirstOrDefaultAsync(e => e.Id == id && e.CoachingId == coachingId.Value);
+
+        if (enrollment == null)
+            return NotFound(new { message = "Enrollment not found" });
+
+        var oldBatchId = enrollment.BatchId;
+        var oldStatus = enrollment.Status;
+
+        // Update fields if provided
+        if (request.StudentId.HasValue)
+        {
+            var student = await _context.Students
+                .FirstOrDefaultAsync(s => s.Id == request.StudentId.Value && s.CoachingId == coachingId.Value && !s.IsDeleted);
+            if (student == null)
+                return NotFound(new { message = "Student not found" });
+            enrollment.StudentId = request.StudentId.Value;
+        }
+
+        if (request.CourseId.HasValue)
+        {
+            var course = await _context.Courses
+                .FirstOrDefaultAsync(c => c.Id == request.CourseId.Value && c.CoachingId == coachingId.Value && !c.IsDeleted);
+            if (course == null)
+                return NotFound(new { message = "Course not found" });
+            enrollment.CourseId = request.CourseId.Value;
+            // Update total fee if course fee is available
+            if (course.Fee.HasValue)
+                enrollment.TotalFee = course.Fee.Value;
+        }
+
+        if (request.BatchId.HasValue && request.BatchId.Value != enrollment.BatchId)
+        {
+            var newBatch = await _context.Batches
+                .FirstOrDefaultAsync(b => b.Id == request.BatchId.Value && b.CoachingId == coachingId.Value && !b.IsDeleted);
+            if (newBatch == null)
+                return NotFound(new { message = "Batch not found" });
+
+            if (newBatch.CurrentStudents >= newBatch.MaxStudents)
+                return BadRequest(new { message = "New batch is full" });
+
+            // Update old batch count
+            if (enrollment.Batch != null && oldStatus == "Active")
+            {
+                enrollment.Batch.CurrentStudents = Math.Max(0, enrollment.Batch.CurrentStudents - 1);
+                enrollment.Batch.UpdatedAt = DateTime.UtcNow;
+            }
+
+            // Update new batch count
+            if (enrollment.Status == "Active")
+            {
+                newBatch.CurrentStudents++;
+                newBatch.UpdatedAt = DateTime.UtcNow;
+            }
+
+            enrollment.BatchId = request.BatchId.Value;
+        }
+
+        if (!string.IsNullOrEmpty(request.Status))
+        {
+            enrollment.Status = request.Status;
+            if (request.Status == "Completed" && enrollment.CompletionDate == null)
+                enrollment.CompletionDate = DateTime.UtcNow;
+        }
+
+        if (request.FeePaid.HasValue)
+            enrollment.FeePaid = request.FeePaid;
+
+        if (request.TotalFee.HasValue)
+            enrollment.TotalFee = request.TotalFee;
+
+        enrollment.UpdatedAt = DateTime.UtcNow;
+
+        await _context.SaveChangesAsync();
+
+        return Ok(new { message = "Enrollment updated successfully" });
+    }
+
+    [HttpDelete("{id}")]
+    [Authorize(Roles = "Coaching Admin,Super Admin")]
+    public async Task<ActionResult> Delete(int id)
+    {
+        var coachingId = GetCoachingId();
+        if (coachingId == null)
+            return Unauthorized();
+
+        var enrollment = await _context.Enrollments
+            .Include(e => e.Batch)
+            .FirstOrDefaultAsync(e => e.Id == id && e.CoachingId == coachingId.Value);
+
+        if (enrollment == null)
+            return NotFound(new { message = "Enrollment not found" });
+
+        // Update batch current students count if enrollment was active
+        if (enrollment.Batch != null && enrollment.Status == "Active")
+        {
+            enrollment.Batch.CurrentStudents = Math.Max(0, enrollment.Batch.CurrentStudents - 1);
+            enrollment.Batch.UpdatedAt = DateTime.UtcNow;
+        }
+
+        // Soft delete
+        enrollment.IsDeleted = true;
+        enrollment.UpdatedAt = DateTime.UtcNow;
+
+        await _context.SaveChangesAsync();
+
+        return Ok(new { message = "Enrollment deleted successfully" });
     }
 
     [HttpPut("{id}/complete")]
@@ -177,11 +351,12 @@ public class EnrollmentsController : ControllerBase
         if (enrollment == null)
             return NotFound(new { message = "Enrollment not found" });
 
+        var oldStatus = enrollment.Status;
         enrollment.Status = "Cancelled";
         enrollment.UpdatedAt = DateTime.UtcNow;
 
-        // Update batch current students count
-        if (enrollment.Batch != null && enrollment.Status == "Active")
+        // Update batch current students count if enrollment was active
+        if (enrollment.Batch != null && oldStatus == "Active")
         {
             enrollment.Batch.CurrentStudents = Math.Max(0, enrollment.Batch.CurrentStudents - 1);
             enrollment.Batch.UpdatedAt = DateTime.UtcNow;
@@ -201,14 +376,5 @@ public class EnrollmentsController : ControllerBase
         }
         return null;
     }
-}
-
-public class CreateEnrollmentRequest
-{
-    public int StudentId { get; set; }
-    public int CourseId { get; set; }
-    public int BatchId { get; set; }
-    public decimal? FeePaid { get; set; }
-    public decimal? TotalFee { get; set; }
 }
 

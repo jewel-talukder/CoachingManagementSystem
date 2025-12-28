@@ -129,6 +129,8 @@ using (var scope = app.Services.CreateScope())
         CoachingManagementSystem.Infrastructure.Data.DbSeeder.SeedRolesAsync(context).Wait();
         CoachingManagementSystem.Infrastructure.Data.DbSeeder.SeedPlansAsync(context).Wait();
         CoachingManagementSystem.Infrastructure.Data.DbSeeder.SeedMainAdminAsync(context).Wait();
+        CoachingManagementSystem.Infrastructure.Data.DbSeeder.SeedQualificationsAsync(context).Wait();
+        CoachingManagementSystem.Infrastructure.Data.DbSeeder.SeedSpecializationsAsync(context).Wait();
         logger.LogInformation("Database initialized and seeded successfully.");
     }
     catch (Exception ex)
