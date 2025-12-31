@@ -4,6 +4,7 @@ using CoachingManagementSystem.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace CoachingManagementSystem.Infrastructure.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251229055229_AddBranchIdToPayments")]
+    partial class AddBranchIdToPayments
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -483,9 +486,6 @@ namespace CoachingManagementSystem.Infrastructure.Migrations
                     b.Property<decimal>("Amount")
                         .HasColumnType("decimal(18,2)");
 
-                    b.Property<int>("BranchId")
-                        .HasColumnType("int");
-
                     b.Property<int>("CoachingId")
                         .HasColumnType("int");
 
@@ -529,8 +529,6 @@ namespace CoachingManagementSystem.Infrastructure.Migrations
                         .HasColumnType("datetime2");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("BranchId");
 
                     b.HasIndex("CoachingId");
 
@@ -936,9 +934,6 @@ namespace CoachingManagementSystem.Infrastructure.Migrations
                     b.Property<string>("EmployeeCode")
                         .HasColumnType("nvarchar(450)");
 
-                    b.Property<int>("EmploymentType")
-                        .HasColumnType("int");
-
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("bit");
 
@@ -947,9 +942,6 @@ namespace CoachingManagementSystem.Infrastructure.Migrations
 
                     b.Property<int?>("QualificationId")
                         .HasColumnType("int");
-
-                    b.Property<decimal?>("Salary")
-                        .HasColumnType("decimal(18,2)");
 
                     b.Property<int?>("SpecializationId")
                         .HasColumnType("int");
@@ -1290,12 +1282,6 @@ namespace CoachingManagementSystem.Infrastructure.Migrations
 
             modelBuilder.Entity("CoachingManagementSystem.Domain.Entities.Payment", b =>
                 {
-                    b.HasOne("CoachingManagementSystem.Domain.Entities.Branch", "Branch")
-                        .WithMany()
-                        .HasForeignKey("BranchId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
                     b.HasOne("CoachingManagementSystem.Domain.Entities.Coaching", "Coaching")
                         .WithMany()
                         .HasForeignKey("CoachingId")
@@ -1311,8 +1297,6 @@ namespace CoachingManagementSystem.Infrastructure.Migrations
                         .HasForeignKey("StudentId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
-
-                    b.Navigation("Branch");
 
                     b.Navigation("Coaching");
 

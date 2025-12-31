@@ -103,6 +103,27 @@ public class BatchesController : ControllerBase
         if (course == null)
             return NotFound(new { message = "Course not found" });
 
+        // Check if batch code already exists for this branch (if code is provided)
+        if (!string.IsNullOrWhiteSpace(request.Code))
+        {
+            var existingBatch = await _context.Batches
+                .FirstOrDefaultAsync(b => b.BranchId == branchId.Value && 
+                                         b.Code == request.Code && 
+                                         !b.IsDeleted);
+            
+            if (existingBatch != null)
+            {
+                return Conflict(new { message = $"A batch with code '{request.Code}' already exists in this branch. Please use a different code." });
+            }
+        }
+
+        // Calculate end date based on course duration if not provided
+        DateTime? calculatedEndDate = request.EndDate;
+        if (!calculatedEndDate.HasValue && course.DurationMonths > 0)
+        {
+            calculatedEndDate = request.StartDate.AddMonths(course.DurationMonths);
+        }
+
         // Convert DaySchedules to JSON string if provided
         string? scheduleDaysJson = request.ScheduleDays;
         if (request.DaySchedules != null && request.DaySchedules.Any())
@@ -125,7 +146,7 @@ public class BatchesController : ControllerBase
             CourseId = request.CourseId,
             TeacherId = request.TeacherId,
             StartDate = request.StartDate,
-            EndDate = request.EndDate,
+            EndDate = calculatedEndDate,
             MaxStudents = request.MaxStudents,
             ScheduleDays = scheduleDaysJson,
             StartTime = request.StartTime,
@@ -137,7 +158,37 @@ public class BatchesController : ControllerBase
         _context.Batches.Add(batch);
         await _context.SaveChangesAsync();
 
-        return CreatedAtAction(nameof(GetAll), new { id = batch.Id }, batch);
+        // Reload with related data to create DTO
+        var createdBatch = await _context.Batches
+            .Include(b => b.Course)
+            .Include(b => b.Teacher)
+                .ThenInclude(t => t!.User)
+            .FirstOrDefaultAsync(b => b.Id == batch.Id);
+
+        if (createdBatch == null)
+            return NotFound(new { message = "Batch not found after creation" });
+
+        var batchDto = new BatchDto
+        {
+            Id = createdBatch.Id,
+            Name = createdBatch.Name,
+            Code = createdBatch.Code,
+            Description = createdBatch.Description,
+            CourseId = createdBatch.CourseId,
+            CourseName = createdBatch.Course.Name,
+            TeacherId = createdBatch.TeacherId,
+            TeacherName = createdBatch.Teacher != null ? $"{createdBatch.Teacher.User.FirstName} {createdBatch.Teacher.User.LastName}" : null,
+            StartDate = createdBatch.StartDate,
+            EndDate = createdBatch.EndDate,
+            MaxStudents = createdBatch.MaxStudents,
+            CurrentStudents = createdBatch.CurrentStudents,
+            ScheduleDays = createdBatch.ScheduleDays,
+            StartTime = createdBatch.StartTime,
+            EndTime = createdBatch.EndTime,
+            IsActive = createdBatch.IsActive
+        };
+
+        return CreatedAtAction(nameof(GetAll), new { id = batchDto.Id }, batchDto);
     }
 
     private int? GetCoachingId()

@@ -110,24 +110,44 @@ public class UsersController : ControllerBase
             return BadRequest(new { message = "One or more roles not found" });
         }
 
-        // Get branchId from request or use default branch
+        // Get branchId from request - required for Students and Teachers
         int? branchId = null;
         if (request.AdditionalData?.ContainsKey("BranchId") == true && request.AdditionalData["BranchId"] != null)
         {
-            branchId = Convert.ToInt32(request.AdditionalData["BranchId"]);
+            var branchIdValue = request.AdditionalData["BranchId"];
+            if (branchIdValue != null)
+            {
+                if (int.TryParse(branchIdValue.ToString(), out var parsedBranchId))
+                {
+                    branchId = parsedBranchId;
+                }
+            }
+        }
+
+        // For Students and Teachers, branch is required
+        if ((request.UserType == "Student" || request.UserType == "Teacher") && !branchId.HasValue)
+        {
+            return BadRequest(new { message = "Branch is required for Students and Teachers" });
+        }
+
+        // If branchId is provided, verify it exists and belongs to this coaching
+        if (branchId.HasValue)
+        {
+            var branch = await _context.Branches
+                .FirstOrDefaultAsync(b => b.Id == branchId.Value && b.CoachingId == coachingId.Value && !b.IsDeleted);
+            
+            if (branch == null)
+            {
+                return BadRequest(new { message = "Invalid branch selected" });
+            }
         }
         else
         {
-            // Get default branch
+            // For other user types, try to get default branch
             var defaultBranch = await _context.Branches
                 .FirstOrDefaultAsync(b => b.CoachingId == coachingId.Value && b.IsDefault && !b.IsDeleted);
             if (defaultBranch != null)
                 branchId = defaultBranch.Id;
-        }
-
-        if (!branchId.HasValue)
-        {
-            return BadRequest(new { message = "Branch is required" });
         }
 
         // Create user

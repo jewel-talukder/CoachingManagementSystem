@@ -37,6 +37,7 @@ export default function NewBatchPage() {
   const [loading, setLoading] = useState(false);
   const [courses, setCourses] = useState<any[]>([]);
   const [daySchedules, setDaySchedules] = useState<DaySchedule[]>([]);
+  const [calculatedEndDate, setCalculatedEndDate] = useState<string>('');
   const router = useRouter();
 
   useEffect(() => {
@@ -55,10 +56,37 @@ export default function NewBatchPage() {
   const {
     register,
     handleSubmit,
+    watch,
+    setValue,
     formState: { errors },
   } = useForm<BatchFormData>({
     resolver: zodResolver(batchSchema),
   });
+
+  const watchedCourseId = watch('courseId');
+  const watchedStartDate = watch('startDate');
+
+  // Calculate end date when course or start date changes
+  useEffect(() => {
+    if (watchedCourseId && watchedStartDate) {
+      const course = courses.find(c => c.id === watchedCourseId);
+      if (course && course.durationMonths && watchedStartDate) {
+        const start = new Date(watchedStartDate);
+        const end = new Date(start);
+        end.setMonth(end.getMonth() + course.durationMonths);
+        
+        const endDateStr = end.toISOString().split('T')[0];
+        setCalculatedEndDate(endDateStr);
+        setValue('endDate', endDateStr);
+      } else {
+        setCalculatedEndDate('');
+        setValue('endDate', '');
+      }
+    } else {
+      setCalculatedEndDate('');
+      setValue('endDate', '');
+    }
+  }, [watchedCourseId, watchedStartDate, courses, setValue]);
 
   const toggleDay = (day: string) => {
     setDaySchedules(prev => {
@@ -109,7 +137,12 @@ export default function NewBatchPage() {
       await batchesApi.create(batchData);
       router.push('/admin/batches');
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to create batch');
+      // Handle specific error messages from the API
+      const errorMessage = err.response?.data?.message || 
+                          err.response?.data?.error || 
+                          err.message || 
+                          'Failed to create batch';
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -179,7 +212,7 @@ export default function NewBatchPage() {
                 <option value="">Select a course</option>
                 {courses.map((course) => (
                   <option key={course.id} value={course.id}>
-                    {course.name}
+                    {course.name} {course.durationMonths ? `(${course.durationMonths} months)` : ''}
                   </option>
                 ))}
               </select>
@@ -221,14 +254,24 @@ export default function NewBatchPage() {
 
             <div>
               <label htmlFor="endDate" className="block text-sm font-medium text-gray-700">
-                End Date
+                End Date {calculatedEndDate && <span className="text-xs text-gray-500">(Auto-calculated)</span>}
               </label>
               <input
                 {...register('endDate')}
                 type="date"
                 id="endDate"
+                value={calculatedEndDate || watch('endDate') || ''}
+                onChange={(e) => {
+                  setCalculatedEndDate(e.target.value);
+                  setValue('endDate', e.target.value);
+                }}
                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-3 py-2 border"
               />
+              {calculatedEndDate && (
+                <p className="mt-1 text-xs text-gray-500">
+                  Calculated based on course duration
+                </p>
+              )}
             </div>
 
             <div className="sm:col-span-2">

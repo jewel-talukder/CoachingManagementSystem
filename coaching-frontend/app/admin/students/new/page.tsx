@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import AdminLayout from '@/components/layouts/AdminLayout';
-import { usersApi, coursesApi, batchesApi, enrollmentsApi } from '@/lib/api';
+import { usersApi, coursesApi, batchesApi, enrollmentsApi, branchesApi } from '@/lib/api';
 import { useSettingsStore } from '@/lib/store/settingsStore';
 import { useToastStore } from '@/lib/store/toastStore';
 import { useBranchStore } from '@/lib/store/branchStore';
@@ -16,6 +16,7 @@ export default function NewStudentPage() {
   const { addToast } = useToastStore();
   const { selectedBranch } = useBranchStore();
   const [loading, setLoading] = useState(false);
+  const [branches, setBranches] = useState<any[]>([]);
   const [courses, setCourses] = useState<any[]>([]);
   const [batches, setBatches] = useState<any[]>([]);
   const [selectedCourse, setSelectedCourse] = useState<number | null>(null);
@@ -23,6 +24,7 @@ export default function NewStudentPage() {
   const [enableEnrollment, setEnableEnrollment] = useState(false);
 
   const [formData, setFormData] = useState({
+    branchId: selectedBranch?.id?.toString() || '',
     firstName: '',
     lastName: '',
     email: '',
@@ -39,8 +41,17 @@ export default function NewStudentPage() {
   });
 
   useEffect(() => {
+    fetchBranches();
     fetchCourses();
   }, []);
+
+  useEffect(() => {
+    // Update branchId in formData when selectedBranch changes (only if not already set)
+    if (selectedBranch?.id && !formData.branchId) {
+      setFormData((prev) => ({ ...prev, branchId: selectedBranch.id.toString() }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedBranch]);
 
   useEffect(() => {
     if (selectedCourse) {
@@ -58,6 +69,32 @@ export default function NewStudentPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [enableEnrollment, formData.courseId, formData.batchId, formData.totalFee, formData.feePaid, paymentMode, courses.length, batches.length]);
+
+  const fetchBranches = async () => {
+    try {
+      const response = await branchesApi.getAll();
+      const branchesData = Array.isArray(response.data) 
+        ? response.data 
+        : Array.isArray(response.data?.data) 
+        ? response.data.data 
+        : [];
+      setBranches(branchesData);
+      
+      // Set default branch if not already set
+      if (branchesData.length > 0) {
+        setFormData((prev) => {
+          if (!prev.branchId) {
+            const defaultBranch = branchesData.find((b: any) => b.isDefault) || branchesData[0];
+            return { ...prev, branchId: defaultBranch.id.toString() };
+          }
+          return prev;
+        });
+      }
+    } catch (error) {
+      console.error('Failed to fetch branches:', error);
+      addToast('Failed to load branches', 'error');
+    }
+  };
 
   const fetchCourses = async () => {
     try {
@@ -147,7 +184,7 @@ export default function NewStudentPage() {
         roleIds: [4], // Student role ID - adjust if needed
         userType: 'Student',
         additionalData: {
-          BranchId: selectedBranch?.id || null,
+          BranchId: formData.branchId ? parseInt(formData.branchId) : null,
           StudentCode: formData.studentCode,
           DateOfBirth: formData.dateOfBirth,
           ParentName: formData.parentName,
@@ -213,6 +250,24 @@ export default function NewStudentPage() {
             <form onSubmit={handleSubmit} className="bg-white shadow rounded-lg p-6 space-y-6">
               <div>
                 <h2 className="text-lg font-medium text-gray-900 mb-4">Student Information</h2>
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Branch <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    required
+                    value={formData.branchId}
+                    onChange={(e) => setFormData({ ...formData, branchId: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="">Select Branch</option>
+                    {branches.map((branch) => (
+                      <option key={branch.id} value={branch.id}>
+                        {branch.name} {branch.isDefault && '(Default)'}
+                      </option>
+                    ))}
+                  </select>
+                </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">

@@ -27,6 +27,10 @@ public static class DependencyInjection
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IJwtService, JwtService>();
 
+        // Payment Services
+        services.AddHttpClient();
+        services.AddScoped<IPaymentService, SslPaymentService>();
+
         // CQRS Handlers
         services.AddScoped<CoachingManagementSystem.Application.Features.Courses.Commands.CreateCourseCommandHandler>();
         services.AddScoped<CoachingManagementSystem.Application.Features.Courses.Queries.GetAllCoursesQueryHandler>();

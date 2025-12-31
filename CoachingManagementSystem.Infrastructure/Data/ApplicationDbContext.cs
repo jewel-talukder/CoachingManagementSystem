@@ -247,6 +247,12 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
             .OnDelete(DeleteBehavior.Restrict);
 
         modelBuilder.Entity<Payment>()
+            .HasOne(p => p.Branch)
+            .WithMany()
+            .HasForeignKey(p => p.BranchId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<Payment>()
             .HasOne(p => p.Student)
             .WithMany(s => s.Payments)
             .HasForeignKey(p => p.StudentId)
