@@ -32,9 +32,9 @@ export default function TeachersPage() {
   };
 
   const filteredTeachers = teachers.filter((teacher) => {
-    const fullName = `${teacher.firstName} ${teacher.lastName}`.toLowerCase();
-    const email = teacher.email?.toLowerCase() || '';
-    const employeeCode = teacher.employeeCode?.toLowerCase() || '';
+    const fullName = `${teacher.FirstName} ${teacher.LastName}`.toLowerCase();
+    const email = teacher.Email?.toLowerCase() || '';
+    const employeeCode = teacher.EmployeeCode?.toLowerCase() || '';
     const search = searchTerm.toLowerCase();
     return fullName.includes(search) || email.includes(search) || employeeCode.includes(search);
   });
@@ -136,7 +136,7 @@ export default function TeachersPage() {
                 </tr>
               ) : (
                 filteredTeachers.map((teacher) => (
-                  <tr key={teacher.id}>
+                  <tr key={teacher.Id}>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
                         <div className="flex-shrink-0 h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
@@ -144,49 +144,49 @@ export default function TeachersPage() {
                         </div>
                         <div className="ml-4">
                           <div className="text-sm font-medium text-gray-900">
-                            {teacher.firstName} {teacher.lastName}
+                            {teacher.FirstName} {teacher.LastName}
                           </div>
-                          <div className="text-sm text-gray-500">{teacher.email}</div>
-                          {teacher.phone && (
-                            <div className="text-sm text-gray-500">{teacher.phone}</div>
+                          <div className="text-sm text-gray-500">{teacher.Email}</div>
+                          {teacher.Phone && (
+                            <div className="text-sm text-gray-500">{teacher.Phone}</div>
                           )}
                         </div>
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {teacher.employeeCode || '-'}
+                      {teacher.EmployeeCode || '-'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {teacher.branchName}
+                      {teacher.BranchName}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {teacher.qualificationName || '-'}
+                      {teacher.QualificationName || '-'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {teacher.specializationName || '-'}
+                      {teacher.SpecializationName || '-'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span
                         className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                          teacher.isActive
+                          teacher.IsActive
                             ? 'bg-green-100 text-green-800'
                             : 'bg-gray-100 text-gray-800'
                         }`}
                       >
-                        {teacher.isActive ? 'Active' : 'Inactive'}
+                        {teacher.IsActive ? 'Active' : 'Inactive'}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <div className="flex items-center space-x-3">
                         <Link
-                          href={`/admin/teachers/${teacher.id}/edit`}
+                          href={`/admin/teachers/${teacher.Id}/edit`}
                           className="text-blue-600 hover:text-blue-900"
                         >
                           <Edit className="h-4 w-4" />
                         </Link>
                         <button
-                          onClick={() => handleDelete(teacher.id, `${teacher.firstName} ${teacher.lastName}`)}
-                          disabled={deletingId === teacher.id}
+                          onClick={() => handleDelete(teacher.Id, `${teacher.FirstName} ${teacher.LastName}`)}
+                          disabled={deletingId === teacher.Id}
                           className="text-red-600 hover:text-red-900 disabled:opacity-50"
                         >
                           <Trash2 className="h-4 w-4" />
