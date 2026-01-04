@@ -1,5 +1,8 @@
 import axios from 'axios';
 
+// Get API URL from environment variables
+// Development: https://localhost:7286/api
+// Production: http://93.127.140.63:4000/api
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:7286/api';
 
 export const api = axios.create({

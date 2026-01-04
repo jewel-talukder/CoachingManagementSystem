@@ -47,3 +47,48 @@ To start the production server:
 ```bash
 npm start
 ```
+
+## Production Deployment
+
+For production deployment with the live API URL (`http://93.127.140.63:4000/api`):
+
+### Quick Deploy
+
+**Windows:**
+```bash
+deploy.bat
+```
+
+**Linux/Mac:**
+```bash
+chmod +x deploy.sh
+./deploy.sh
+```
+
+### Manual Deploy
+
+1. Ensure `.env.production` exists with:
+   ```
+   NEXT_PUBLIC_API_URL=http://93.127.140.63:4000/api
+   ```
+
+2. Build for production:
+   ```bash
+   npm run build
+   ```
+
+3. Start production server:
+   ```bash
+   npm start
+   ```
+
+### Using PM2 (Recommended)
+
+```bash
+pm2 start ecosystem.config.js
+pm2 save
+```
+
+For detailed deployment instructions, see:
+- `QUICK_DEPLOY.md` - Quick reference guide
+- `PRODUCTION_DEPLOYMENT.md` - Complete deployment guide
