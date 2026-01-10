@@ -186,6 +186,24 @@ essentialFiles.forEach(file => {
 const nodeModulesPath = path.join(standalonePath, 'node_modules');
 if (fs.existsSync(nodeModulesPath)) {
   console.log('✅ node_modules (folder)');
+  
+  // Verify Next.js is complete in node_modules
+  const nextPath = path.join(nodeModulesPath, 'next');
+  const nextWebpackPath = path.join(nextPath, 'dist', 'compiled', 'webpack');
+  
+  if (fs.existsSync(nextPath)) {
+    if (fs.existsSync(nextWebpackPath)) {
+      console.log('✅ node_modules/next/dist/compiled/webpack (Next.js webpack files present)');
+    } else {
+      console.warn('⚠️  WARNING: node_modules/next/dist/compiled/webpack is MISSING!');
+      console.warn('   This will cause "Cannot find module webpack-lib" error!');
+      console.warn('   Solution: Rebuild from scratch (delete .next and node_modules, then npm install && npm run build)');
+      allFilesPresent = false;
+    }
+  } else {
+    console.error('❌ node_modules/next - MISSING! Next.js is not installed!');
+    allFilesPresent = false;
+  }
 } else {
   console.error('❌ node_modules - MISSING!');
   allFilesPresent = false;

@@ -17,6 +17,11 @@ const nextConfig: NextConfig = {
         ? 'http://93.127.140.63:4000/api' 
         : 'https://localhost:7286/api'),
   },
+  // Ensure all Next.js internal modules are included in standalone build
+  // This helps prevent "Cannot find module" errors in production
+  outputFileTracingIncludes: {
+    '/*': ['./node_modules/next/**/*'],
+  },
 };
 
 export default nextConfig;
