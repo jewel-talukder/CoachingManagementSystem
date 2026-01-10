@@ -3,7 +3,38 @@ import axios from 'axios';
 // Get API URL from environment variables
 // Development: https://localhost:7286/api
 // Production: http://93.127.140.63:4000/api
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:7286/api';
+// IMPORTANT: For production builds, NEXT_PUBLIC_API_URL must be set to production URL
+// This is handled automatically by pre-build.js script
+
+// Force production URL if NEXT_PUBLIC_API_URL contains localhost in production build
+const getApiBaseUrl = () => {
+  const envUrl = process.env.NEXT_PUBLIC_API_URL;
+  
+  // If we have an environment variable, use it
+  if (envUrl) {
+    // In production builds, never allow localhost
+    if (process.env.NODE_ENV === 'production' && envUrl.includes('localhost')) {
+      console.warn('⚠️ Production build detected localhost API URL, using production URL instead');
+      return 'http://93.127.140.63:4000/api';
+    }
+    return envUrl;
+  }
+  
+  // Default fallbacks
+  if (process.env.NODE_ENV === 'production') {
+    return 'http://93.127.140.63:4000/api';
+  }
+  
+  // Development default
+  return 'https://localhost:7286/api';
+};
+
+const API_BASE_URL = getApiBaseUrl();
+
+// Log the API URL being used (only in browser, not during build)
+if (typeof window !== 'undefined') {
+  console.log('🌐 API Base URL:', API_BASE_URL);
+}
 
 export const api = axios.create({
   baseURL: API_BASE_URL,

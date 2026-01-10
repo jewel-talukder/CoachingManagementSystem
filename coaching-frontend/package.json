@@ -4,10 +4,12 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "prebuild": "node scripts/pre-build.js",
     "build": "next build",
-    "build:prod": "NODE_ENV=production next build",
+    "build:prod": "next build",
+    "postbuild": "node scripts/post-build.js",
     "start": "next start",
-    "start:prod": "NODE_ENV=production next start",
+    "start:prod": "next start",
     "lint": "eslint",
     "deploy": "npm run build && npm start"
   },
