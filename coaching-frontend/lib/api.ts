@@ -118,6 +118,7 @@ export const coursesApi = {
 export const batchesApi = {
   getAll: (params?: { courseId?: number; isActive?: boolean }) =>
     api.get('/batches', { params }),
+  getById: (id: number) => api.get(`/batches/${id}`),
   create: (data: any) => api.post('/batches', data),
   update: (id: number, data: any) => api.put(`/batches/${id}`, data),
   delete: (id: number) => api.delete(`/batches/${id}`),

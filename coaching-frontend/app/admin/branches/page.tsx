@@ -37,6 +37,10 @@ export default function BranchesPage() {
 
     try {
       await branchesApi.delete(id);
+      // Dispatch event to notify header to refresh branches
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('branches-updated'));
+      }
       fetchBranches();
     } catch (error: any) {
       alert(error.response?.data?.message || 'Failed to delete branch');

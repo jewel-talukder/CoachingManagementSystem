@@ -23,8 +23,42 @@ export default function AdminHeader({ menuItems }: AdminHeaderProps) {
   const [loadingBranches, setLoadingBranches] = useState(false);
 
   useEffect(() => {
-    if (user && branches.length === 0) {
+    if (user) {
       fetchBranches();
+    }
+  }, [user]);
+
+  // Refetch branches when navigating to branches page or when pathname changes
+  useEffect(() => {
+    if (user && pathname === '/admin/branches') {
+      fetchBranches();
+    }
+  }, [pathname, user]);
+
+  // Listen for branch updates (when branches are added/updated/deleted)
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const handleBranchUpdate = () => {
+        if (user) {
+          fetchBranches();
+        }
+      };
+
+      // Listen for custom event when branches are modified
+      window.addEventListener('branches-updated', handleBranchUpdate);
+      
+      // Also refresh when window regains focus (user might have added branch in another tab)
+      const handleFocus = () => {
+        if (user) {
+          fetchBranches();
+        }
+      };
+      window.addEventListener('focus', handleFocus);
+
+      return () => {
+        window.removeEventListener('branches-updated', handleBranchUpdate);
+        window.removeEventListener('focus', handleFocus);
+      };
     }
   }, [user]);
 
@@ -32,7 +66,9 @@ export default function AdminHeader({ menuItems }: AdminHeaderProps) {
     try {
       setLoadingBranches(true);
       const response = await branchesApi.getAll();
-      setBranches(response.data);
+      // Handle both direct array response and wrapped response
+      const branchesData = Array.isArray(response.data) ? response.data : (response.data?.data || []);
+      setBranches(branchesData);
     } catch (error) {
       console.error('Failed to fetch branches:', error);
     } finally {

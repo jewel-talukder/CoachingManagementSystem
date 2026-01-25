@@ -3,12 +3,14 @@
 import { useEffect, useState } from 'react';
 import AdminLayout from '@/components/layouts/AdminLayout';
 import { batchesApi } from '@/lib/api';
-import { Plus } from 'lucide-react';
+import { Plus, Pencil, Trash2 } from 'lucide-react';
 import Link from 'next/link';
+import { useToastStore } from '@/lib/store/toastStore';
 
 export default function BatchesPage() {
   const [batches, setBatches] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const { addToast } = useToastStore();
 
   useEffect(() => {
     fetchBatches();
@@ -20,8 +22,24 @@ export default function BatchesPage() {
       setBatches(response.data);
     } catch (error) {
       console.error('Failed to fetch batches:', error);
+      addToast('Failed to load batches', 'error');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDelete = async (id: number, name: string) => {
+    if (!confirm(`Are you sure you want to delete batch "${name}"? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      await batchesApi.delete(id);
+      addToast('Batch deleted successfully', 'success');
+      fetchBatches();
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.message || 'Failed to delete batch';
+      addToast(errorMessage, 'error');
     }
   };
 
@@ -55,11 +73,23 @@ export default function BatchesPage() {
               <li key={batch.id}>
                 <div className="px-4 py-4 sm:px-6 hover:bg-gray-50">
                   <div className="flex items-center justify-between">
-                    <div>
-                      <div className="text-sm font-medium text-gray-900">{batch.name}</div>
-                      <div className="text-sm text-gray-500">{batch.courseName}</div>
+                    <div className="flex-1">
+                      <div className="flex items-center">
+                        <div className="text-sm font-medium text-gray-900">{batch.name}</div>
+                        {batch.code && (
+                          <span className="ml-2 text-xs text-gray-500">({batch.code})</span>
+                        )}
+                      </div>
+                      {batch.description && (
+                        <div className="text-sm text-gray-500 mt-1">{batch.description}</div>
+                      )}
                       {batch.teacherName && (
-                        <div className="text-sm text-gray-500">Teacher: {batch.teacherName}</div>
+                        <div className="text-sm text-gray-500 mt-1">Teacher: {batch.teacherName}</div>
+                      )}
+                      {batch.monthlyFee && (
+                        <div className="text-sm text-gray-500 mt-1">
+                          Monthly Fee: {batch.monthlyFee} Taka
+                        </div>
                       )}
                     </div>
                     <div className="flex items-center space-x-4">
@@ -67,9 +97,9 @@ export default function BatchesPage() {
                         <div className="text-sm text-gray-500">
                           Students: {batch.currentStudents}/{batch.maxStudents}
                         </div>
-                        {batch.startTime && batch.endTime && (
-                          <div className="text-sm text-gray-500">
-                            {batch.startTime} - {batch.endTime}
+                        {batch.startDate && (
+                          <div className="text-xs text-gray-400 mt-1">
+                            Start: {new Date(batch.startDate).toLocaleDateString()}
                           </div>
                         )}
                       </div>
@@ -82,6 +112,23 @@ export default function BatchesPage() {
                       >
                         {batch.isActive ? 'Active' : 'Inactive'}
                       </span>
+                      <div className="flex items-center space-x-2">
+                        <Link
+                          href={`/admin/batches/${batch.id}/edit`}
+                          className="text-blue-600 hover:text-blue-800"
+                          title="Edit batch"
+                        >
+                          <Pencil className="h-5 w-5" />
+                        </Link>
+                        <button
+                          onClick={() => handleDelete(batch.id, batch.name)}
+                          className="text-red-600 hover:text-red-800"
+                          title="Delete batch"
+                          disabled={batch.currentStudents > 0}
+                        >
+                          <Trash2 className="h-5 w-5" />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>

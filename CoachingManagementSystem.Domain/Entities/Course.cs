@@ -21,6 +21,5 @@ public class Course : BaseEntity
     // Navigation properties
     public ICollection<Subject> Subjects { get; set; } = new List<Subject>();
     public ICollection<Enrollment> Enrollments { get; set; } = new List<Enrollment>();
-    public ICollection<Batch> Batches { get; set; } = new List<Batch>();
 }
 

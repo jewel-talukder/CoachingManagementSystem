@@ -8,9 +8,6 @@ public class Batch : BaseEntity
     public int BranchId { get; set; }
     public Branch Branch { get; set; } = null!;
     
-    public int CourseId { get; set; }
-    public Course Course { get; set; } = null!;
-    
     public string Name { get; set; } = string.Empty;
     public string? Code { get; set; }
     public string? Description { get; set; }
@@ -21,6 +18,7 @@ public class Batch : BaseEntity
     public DateTime? EndDate { get; set; }
     public int MaxStudents { get; set; }
     public int CurrentStudents { get; set; } = 0;
+    public decimal MonthlyFee { get; set; } // Monthly fee for this batch
     
     // Schedule - JSON format: [{"day": "Monday", "startTime": "09:00:00", "endTime": "10:00:00"}, ...]
     public string? ScheduleDays { get; set; } // JSON array of day schedules with times

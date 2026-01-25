@@ -95,13 +95,11 @@ public class DashboardController : ControllerBase
             return NotFound(new { message = "Teacher not found" });
 
         var assignedBatches = await _context.Batches
-            .Include(b => b.Course)
             .Where(b => b.CoachingId == coachingId.Value && b.TeacherId == teacher.Id && b.IsActive && !b.IsDeleted)
             .Select(b => new
             {
                 Id = b.Id,
                 Name = b.Name,
-                CourseName = b.Course.Name,
                 CurrentStudents = b.CurrentStudents,
                 MaxStudents = b.MaxStudents,
                 StartTime = b.StartTime,

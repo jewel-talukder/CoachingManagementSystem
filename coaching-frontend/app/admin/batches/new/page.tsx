@@ -6,7 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useRouter } from 'next/navigation';
 import AdminLayout from '@/components/layouts/AdminLayout';
-import { batchesApi, coursesApi } from '@/lib/api';
+import { batchesApi } from '@/lib/api';
 
 interface DaySchedule {
   day: string;
@@ -18,11 +18,11 @@ const batchSchema = z.object({
   name: z.string().min(1, 'Batch name is required'),
   code: z.string().optional(),
   description: z.string().optional(),
-  courseId: z.number().min(1, 'Course is required'),
   teacherId: z.number().optional(),
   startDate: z.string().min(1, 'Start date is required'),
   endDate: z.string().optional(),
   maxStudents: z.number().min(1, 'Max students must be at least 1'),
+  monthlyFee: z.number().min(0, 'Monthly fee must be 0 or greater'),
   scheduleDays: z.string().optional(),
   startTime: z.string().optional(),
   endTime: z.string().optional(),
@@ -35,23 +35,8 @@ const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'
 export default function NewBatchPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [courses, setCourses] = useState<any[]>([]);
   const [daySchedules, setDaySchedules] = useState<DaySchedule[]>([]);
-  const [calculatedEndDate, setCalculatedEndDate] = useState<string>('');
   const router = useRouter();
-
-  useEffect(() => {
-    fetchCourses();
-  }, []);
-
-  const fetchCourses = async () => {
-    try {
-      const response = await coursesApi.getAll({ isActive: true });
-      setCourses(response.data.data || response.data);
-    } catch (error) {
-      console.error('Failed to fetch courses:', error);
-    }
-  };
 
   const {
     register,
@@ -62,31 +47,6 @@ export default function NewBatchPage() {
   } = useForm<BatchFormData>({
     resolver: zodResolver(batchSchema),
   });
-
-  const watchedCourseId = watch('courseId');
-  const watchedStartDate = watch('startDate');
-
-  // Calculate end date when course or start date changes
-  useEffect(() => {
-    if (watchedCourseId && watchedStartDate) {
-      const course = courses.find(c => c.id === watchedCourseId);
-      if (course && course.durationMonths && watchedStartDate) {
-        const start = new Date(watchedStartDate);
-        const end = new Date(start);
-        end.setMonth(end.getMonth() + course.durationMonths);
-        
-        const endDateStr = end.toISOString().split('T')[0];
-        setCalculatedEndDate(endDateStr);
-        setValue('endDate', endDateStr);
-      } else {
-        setCalculatedEndDate('');
-        setValue('endDate', '');
-      }
-    } else {
-      setCalculatedEndDate('');
-      setValue('endDate', '');
-    }
-  }, [watchedCourseId, watchedStartDate, courses, setValue]);
 
   const toggleDay = (day: string) => {
     setDaySchedules(prev => {
@@ -201,27 +161,6 @@ export default function NewBatchPage() {
             </div>
 
             <div>
-              <label htmlFor="courseId" className="block text-sm font-medium text-gray-700">
-                Course *
-              </label>
-              <select
-                {...register('courseId', { valueAsNumber: true })}
-                id="courseId"
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-3 py-2 border"
-              >
-                <option value="">Select a course</option>
-                {courses.map((course) => (
-                  <option key={course.id} value={course.id}>
-                    {course.name} {course.durationMonths ? `(${course.durationMonths} months)` : ''}
-                  </option>
-                ))}
-              </select>
-              {errors.courseId && (
-                <p className="mt-1 text-sm text-red-600">{errors.courseId.message}</p>
-              )}
-            </div>
-
-            <div>
               <label htmlFor="maxStudents" className="block text-sm font-medium text-gray-700">
                 Max Students *
               </label>
@@ -235,6 +174,27 @@ export default function NewBatchPage() {
               {errors.maxStudents && (
                 <p className="mt-1 text-sm text-red-600">{errors.maxStudents.message}</p>
               )}
+            </div>
+
+            <div>
+              <label htmlFor="monthlyFee" className="block text-sm font-medium text-gray-700">
+                Monthly Fee (Taka) *
+              </label>
+              <input
+                {...register('monthlyFee', { valueAsNumber: true })}
+                type="number"
+                id="monthlyFee"
+                step="0.01"
+                min="0"
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-3 py-2 border"
+                placeholder="0.00"
+              />
+              {errors.monthlyFee && (
+                <p className="mt-1 text-sm text-red-600">{errors.monthlyFee.message}</p>
+              )}
+              <p className="mt-1 text-xs text-gray-500">
+                Monthly fee per student for this batch
+              </p>
             </div>
 
             <div>
@@ -254,24 +214,14 @@ export default function NewBatchPage() {
 
             <div>
               <label htmlFor="endDate" className="block text-sm font-medium text-gray-700">
-                End Date {calculatedEndDate && <span className="text-xs text-gray-500">(Auto-calculated)</span>}
+                End Date
               </label>
               <input
                 {...register('endDate')}
                 type="date"
                 id="endDate"
-                value={calculatedEndDate || watch('endDate') || ''}
-                onChange={(e) => {
-                  setCalculatedEndDate(e.target.value);
-                  setValue('endDate', e.target.value);
-                }}
                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-3 py-2 border"
               />
-              {calculatedEndDate && (
-                <p className="mt-1 text-xs text-gray-500">
-                  Calculated based on course duration
-                </p>
-              )}
             </div>
 
             <div className="sm:col-span-2">

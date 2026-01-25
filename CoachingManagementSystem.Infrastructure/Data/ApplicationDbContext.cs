@@ -143,12 +143,6 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
             .HasForeignKey(b => b.BranchId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        modelBuilder.Entity<Batch>()
-            .HasOne(b => b.Course)
-            .WithMany(c => c.Batches)
-            .HasForeignKey(b => b.CourseId)
-            .OnDelete(DeleteBehavior.Restrict);
-
         // Configure other relationships
         modelBuilder.Entity<Subject>()
             .HasOne(s => s.Coaching)

@@ -30,15 +30,8 @@ export default function NewEnrollmentPage() {
   useEffect(() => {
     fetchCourses();
     fetchStudents();
+    fetchBatches();
   }, []);
-
-  useEffect(() => {
-    if (selectedCourse) {
-      fetchBatches(selectedCourse);
-    } else {
-      setBatches([]);
-    }
-  }, [selectedCourse]);
 
   const fetchCourses = async () => {
     try {
@@ -49,9 +42,9 @@ export default function NewEnrollmentPage() {
     }
   };
 
-  const fetchBatches = async (courseId: number) => {
+  const fetchBatches = async () => {
     try {
-      const response = await batchesApi.getAll({ courseId, isActive: true });
+      const response = await batchesApi.getAll({ isActive: true });
       setBatches(response.data);
     } catch (error) {
       console.error('Failed to fetch batches:', error);
@@ -78,13 +71,26 @@ export default function NewEnrollmentPage() {
   });
 
   const courseId = watch('courseId');
+  const batchId = watch('batchId');
 
   useEffect(() => {
     if (courseId) {
       setSelectedCourse(courseId);
-      setValue('batchId', 0); // Reset batch selection
     }
   }, [courseId, setValue]);
+
+  // Auto-calculate TotalFee when batch or course changes
+  useEffect(() => {
+    if (batchId && courseId && batches.length > 0 && courses.length > 0) {
+      const selectedBatch = batches.find(b => b.id === batchId);
+      const selectedCourse = courses.find(c => c.id === courseId);
+      
+      if (selectedBatch && selectedCourse && selectedBatch.monthlyFee && selectedCourse.durationMonths) {
+        const calculatedTotalFee = selectedBatch.monthlyFee * selectedCourse.durationMonths;
+        setValue('totalFee', calculatedTotalFee);
+      }
+    }
+  }, [batchId, courseId, batches, courses, setValue]);
 
   const onSubmit = async (data: EnrollmentFormData) => {
     setError(null);
@@ -162,13 +168,13 @@ export default function NewEnrollmentPage() {
               <select
                 {...register('batchId', { valueAsNumber: true })}
                 id="batchId"
-                disabled={!selectedCourse || batches.length === 0}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-3 py-2 border disabled:bg-gray-100"
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-3 py-2 border"
               >
-                <option value="">{selectedCourse ? 'Select a batch' : 'Select course first'}</option>
+                <option value="">Select a batch</option>
                 {batches.map((batch) => (
                   <option key={batch.id} value={batch.id}>
                     {batch.name} ({batch.currentStudents}/{batch.maxStudents} students)
+                    {batch.monthlyFee ? ` - ${batch.monthlyFee} Taka/month` : ''}
                   </option>
                 ))}
               </select>
@@ -179,7 +185,9 @@ export default function NewEnrollmentPage() {
 
             <div>
               <label htmlFor="totalFee" className="block text-sm font-medium text-gray-700">
-                Total Fee (₹)
+                Total Fee (Taka) {batchId && courseId && (
+                  <span className="text-xs text-gray-500">(Auto-calculated)</span>
+                )}
               </label>
               <input
                 {...register('totalFee', { valueAsNumber: true })}
@@ -187,8 +195,16 @@ export default function NewEnrollmentPage() {
                 id="totalFee"
                 step="0.01"
                 min="0"
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-3 py-2 border"
+                readOnly={batchId && courseId ? true : false}
+                className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-3 py-2 border ${
+                  batchId && courseId ? 'bg-gray-50 cursor-not-allowed' : ''
+                }`}
               />
+              {batchId && courseId && (
+                <p className="mt-1 text-xs text-gray-500">
+                  Calculated as: Batch Monthly Fee × Course Duration
+                </p>
+              )}
             </div>
 
             <div>

@@ -76,6 +76,10 @@ export default function EditBranchPageClient() {
 
     try {
       await branchesApi.update(branchId, data);
+      // Dispatch event to notify header to refresh branches
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('branches-updated'));
+      }
       router.push('/admin/branches');
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to update branch');

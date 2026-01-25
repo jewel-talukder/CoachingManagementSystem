@@ -163,6 +163,22 @@ public class EnrollmentsController : ControllerBase
         if (existingEnrollment != null)
             return BadRequest(new { message = "Student is already enrolled in this batch" });
 
+        // Calculate TotalFee: Batch MonthlyFee × Course DurationMonths
+        decimal? calculatedTotalFee = null;
+        if (batch.MonthlyFee > 0 && course.DurationMonths > 0)
+        {
+            calculatedTotalFee = batch.MonthlyFee * course.DurationMonths;
+        }
+        else if (request.TotalFee.HasValue)
+        {
+            calculatedTotalFee = request.TotalFee.Value;
+        }
+        else if (course.Fee.HasValue)
+        {
+            // Fallback to course fee if batch monthly fee is not set
+            calculatedTotalFee = course.Fee.Value;
+        }
+
         var enrollment = new Enrollment
         {
             CoachingId = coachingId.Value,
@@ -173,7 +189,7 @@ public class EnrollmentsController : ControllerBase
             EnrollmentDate = DateTime.UtcNow,
             Status = "Active",
             FeePaid = request.FeePaid,
-            TotalFee = course.Fee ?? request.TotalFee
+            TotalFee = calculatedTotalFee
         };
 
         _context.Enrollments.Add(enrollment);
@@ -222,9 +238,19 @@ public class EnrollmentsController : ControllerBase
             if (course == null)
                 return NotFound(new { message = "Course not found" });
             enrollment.CourseId = request.CourseId.Value;
-            // Update total fee if course fee is available
-            if (course.Fee.HasValue)
+            
+            // Recalculate total fee: Batch MonthlyFee × Course DurationMonths
+            var batch = await _context.Batches
+                .FirstOrDefaultAsync(b => b.Id == enrollment.BatchId && !b.IsDeleted);
+            if (batch != null && batch.MonthlyFee > 0 && course.DurationMonths > 0)
+            {
+                enrollment.TotalFee = batch.MonthlyFee * course.DurationMonths;
+            }
+            else if (course.Fee.HasValue)
+            {
+                // Fallback to course fee if batch monthly fee is not set
                 enrollment.TotalFee = course.Fee.Value;
+            }
         }
 
         if (request.BatchId.HasValue && request.BatchId.Value != enrollment.BatchId)

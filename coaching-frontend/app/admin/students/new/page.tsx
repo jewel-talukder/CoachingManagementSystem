@@ -19,7 +19,6 @@ export default function NewStudentPage() {
   const [branches, setBranches] = useState<any[]>([]);
   const [courses, setCourses] = useState<any[]>([]);
   const [batches, setBatches] = useState<any[]>([]);
-  const [selectedCourse, setSelectedCourse] = useState<number | null>(null);
   const [paymentDue, setPaymentDue] = useState<number | null>(null);
   const [enableEnrollment, setEnableEnrollment] = useState(false);
 
@@ -54,12 +53,12 @@ export default function NewStudentPage() {
   }, [selectedBranch]);
 
   useEffect(() => {
-    if (selectedCourse) {
-      fetchBatches(selectedCourse);
+    if (enableEnrollment) {
+      fetchBatches();
     } else {
       setBatches([]);
     }
-  }, [selectedCourse]);
+  }, [enableEnrollment]);
 
   useEffect(() => {
     if (enableEnrollment) {
@@ -113,9 +112,9 @@ export default function NewStudentPage() {
     }
   };
 
-  const fetchBatches = async (courseId: number) => {
+  const fetchBatches = async () => {
     try {
-      const response = await batchesApi.getAll({ courseId, isActive: true });
+      const response = await batchesApi.getAll({ isActive: true });
       // Handle different response structures
       const batchesData = Array.isArray(response.data) 
         ? response.data 
@@ -129,8 +128,27 @@ export default function NewStudentPage() {
     }
   };
 
+  // Auto-calculate TotalFee when batch and course are selected
+  useEffect(() => {
+    if (enableEnrollment && formData.courseId && formData.batchId && courses.length > 0 && batches.length > 0) {
+      const courseId = parseInt(formData.courseId);
+      const batchId = parseInt(formData.batchId);
+
+      if (!isNaN(courseId) && !isNaN(batchId)) {
+        const course = courses.find((c) => c.id === courseId);
+        const batch = batches.find((b) => b.id === batchId);
+
+        if (course && batch && batch.monthlyFee && course.durationMonths) {
+          // Calculate: Batch MonthlyFee × Course DurationMonths
+          const calculatedTotalFee = batch.monthlyFee * course.durationMonths;
+          setFormData((prev) => ({ ...prev, totalFee: calculatedTotalFee.toFixed(2) }));
+        }
+      }
+    }
+  }, [formData.courseId, formData.batchId, courses, batches, enableEnrollment]);
+
   const calculatePaymentDue = () => {
-    if (!formData.courseId || !formData.batchId || courses.length === 0) {
+    if (!formData.courseId || !formData.batchId || courses.length === 0 || batches.length === 0) {
       setPaymentDue(null);
       return;
     }
@@ -148,16 +166,15 @@ export default function NewStudentPage() {
       const batch = batches.find((b) => b.id === batchId);
 
       if (course && batch) {
-        const totalFee = parseFloat(formData.totalFee) || parseFloat(course.fee) || 0;
+        const totalFee = parseFloat(formData.totalFee) || 0;
         const feePaid = parseFloat(formData.feePaid) || 0;
 
         if (paymentMode === 'monthly') {
-          // For monthly: calculate monthly fee (assuming course fee is total, divide by months)
-          // You can adjust this logic based on your business rules
-          const monthlyFee = totalFee / 12; // Assuming 12 months
+          // For monthly: calculate monthly fee from batch monthly fee
+          const monthlyFee = batch.monthlyFee || 0;
           setPaymentDue(Math.max(0, monthlyFee - feePaid));
         } else {
-          // For batch-wise: show batch/course fee
+          // For batch-wise: show total fee minus paid
           setPaymentDue(Math.max(0, totalFee - feePaid));
         }
       } else {
@@ -387,7 +404,6 @@ export default function NewStudentPage() {
                         if (!e.target.checked) {
                           // Clear enrollment fields when unchecked
                           setFormData({ ...formData, courseId: '', batchId: '', totalFee: '', feePaid: '' });
-                          setSelectedCourse(null);
                         }
                       }}
                       className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
@@ -404,15 +420,14 @@ export default function NewStudentPage() {
                     <select
                       value={formData.courseId}
                       onChange={(e) => {
-                        setSelectedCourse(parseInt(e.target.value));
-                        setFormData({ ...formData, courseId: e.target.value, batchId: '' });
+                        setFormData({ ...formData, courseId: e.target.value });
                       }}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
                     >
                       <option value="">Select Course</option>
                       {courses.map((course) => (
                         <option key={course.id} value={course.id}>
-                          {course.name}
+                          {course.name} {course.durationMonths ? `(${course.durationMonths} months)` : ''}
                         </option>
                       ))}
                     </select>
@@ -422,13 +437,13 @@ export default function NewStudentPage() {
                     <select
                       value={formData.batchId}
                       onChange={(e) => setFormData({ ...formData, batchId: e.target.value })}
-                      disabled={!selectedCourse}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
                     >
                       <option value="">Select Batch</option>
                       {batches.map((batch) => (
                         <option key={batch.id} value={batch.id}>
                           {batch.name} ({batch.currentStudents}/{batch.maxStudents})
+                          {batch.monthlyFee ? ` - ${batch.monthlyFee} Taka/month` : ''}
                         </option>
                       ))}
                     </select>
@@ -437,17 +452,29 @@ export default function NewStudentPage() {
 
                     <div className="grid grid-cols-2 gap-4 mt-4">
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Total Fee</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Total Fee (Taka) {formData.courseId && formData.batchId && (
+                            <span className="text-xs text-gray-500">(Auto-calculated)</span>
+                          )}
+                        </label>
                         <input
                           type="number"
                           step="0.01"
                           value={formData.totalFee}
                           onChange={(e) => setFormData({ ...formData, totalFee: e.target.value })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                          readOnly={formData.courseId && formData.batchId ? true : false}
+                          className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 ${
+                            formData.courseId && formData.batchId ? 'bg-gray-50 cursor-not-allowed' : ''
+                          }`}
                         />
+                        {formData.courseId && formData.batchId && (
+                          <p className="mt-1 text-xs text-gray-500">
+                            Calculated as: Batch Monthly Fee × Course Duration
+                          </p>
+                        )}
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Fee Paid</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Fee Paid (Taka)</label>
                         <input
                           type="number"
                           step="0.01"
@@ -499,7 +526,7 @@ export default function NewStudentPage() {
                         {paymentMode === 'monthly' ? 'Monthly Payment Due' : 'Batch Payment Due'}
                       </div>
                       <div className="text-2xl font-bold text-yellow-900">
-                        ${paymentDue !== null ? paymentDue.toFixed(2) : '0.00'}
+                        {paymentDue !== null ? `${paymentDue.toFixed(2)} Taka` : '0.00 Taka'}
                       </div>
                     </div>
 
@@ -507,7 +534,7 @@ export default function NewStudentPage() {
                       <div className="p-4 bg-gray-50 rounded-lg">
                         <div className="text-sm text-gray-600 mb-1">Total Fee</div>
                         <div className="text-lg font-semibold text-gray-900">
-                          ${parseFloat(formData.totalFee).toFixed(2)}
+                          {parseFloat(formData.totalFee).toFixed(2)} Taka
                         </div>
                       </div>
                     )}
@@ -516,7 +543,7 @@ export default function NewStudentPage() {
                       <div className="p-4 bg-green-50 rounded-lg">
                         <div className="text-sm text-gray-600 mb-1">Fee Paid</div>
                         <div className="text-lg font-semibold text-green-900">
-                          ${parseFloat(formData.feePaid).toFixed(2)}
+                          {parseFloat(formData.feePaid).toFixed(2)} Taka
                         </div>
                       </div>
                     )}

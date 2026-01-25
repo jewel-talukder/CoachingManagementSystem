@@ -4,6 +4,7 @@ using CoachingManagementSystem.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace CoachingManagementSystem.Infrastructure.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260124191418_AddMonthlyFeeToBatch")]
+    partial class AddMonthlyFeeToBatch
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -91,6 +94,9 @@ namespace CoachingManagementSystem.Infrastructure.Migrations
                     b.Property<string>("Code")
                         .HasColumnType("nvarchar(450)");
 
+                    b.Property<int>("CourseId")
+                        .HasColumnType("int");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
@@ -140,6 +146,8 @@ namespace CoachingManagementSystem.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("CoachingId");
+
+                    b.HasIndex("CourseId");
 
                     b.HasIndex("TeacherId");
 
@@ -1153,6 +1161,12 @@ namespace CoachingManagementSystem.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("CoachingManagementSystem.Domain.Entities.Course", "Course")
+                        .WithMany("Batches")
+                        .HasForeignKey("CourseId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("CoachingManagementSystem.Domain.Entities.Teacher", "Teacher")
                         .WithMany("Batches")
                         .HasForeignKey("TeacherId");
@@ -1160,6 +1174,8 @@ namespace CoachingManagementSystem.Infrastructure.Migrations
                     b.Navigation("Branch");
 
                     b.Navigation("Coaching");
+
+                    b.Navigation("Course");
 
                     b.Navigation("Teacher");
                 });
@@ -1562,6 +1578,8 @@ namespace CoachingManagementSystem.Infrastructure.Migrations
 
             modelBuilder.Entity("CoachingManagementSystem.Domain.Entities.Course", b =>
                 {
+                    b.Navigation("Batches");
+
                     b.Navigation("Enrollments");
 
                     b.Navigation("Subjects");
