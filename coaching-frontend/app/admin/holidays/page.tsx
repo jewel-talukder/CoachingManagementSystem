@@ -58,10 +58,15 @@ export default function HolidaysPage() {
     return `${formatDate(startDate)} - ${formatDate(endDate)}`;
   };
 
-  const getDayName = (dayOfWeek: number | null) => {
-    if (dayOfWeek === null || dayOfWeek === undefined) return '';
-    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-    return days[dayOfWeek] || '';
+  const getDayNames = (daysOfWeek: string | null) => {
+    if (!daysOfWeek) return '';
+    try {
+      const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+      const dayNumbers = JSON.parse(daysOfWeek) as number[];
+      return dayNumbers.map((d) => days[d]).join(', ');
+    } catch {
+      return '';
+    }
   };
 
   const isUpcoming = (startDate: string, endDate: string | null) => {
@@ -165,8 +170,8 @@ export default function HolidaysPage() {
                             )}
                           </div>
                           <div className="mt-1 text-sm text-gray-500">
-                            {holiday.holidayType === 'WeeklyOff' && holiday.dayOfWeek !== null ? (
-                              <span className="font-medium">Every {getDayName(holiday.dayOfWeek)}</span>
+                            {holiday.holidayType === 'WeeklyOff' && holiday.daysOfWeek ? (
+                              <span className="font-medium">Every {getDayNames(holiday.daysOfWeek)}</span>
                             ) : (
                               <span className="font-medium">
                                 {formatDateRange(holiday.startDate, holiday.endDate)}

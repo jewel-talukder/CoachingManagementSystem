@@ -11,7 +11,8 @@ public class HolidayDto
     public string HolidayType { get; set; } = "SingleDay"; // "SingleDay", "DateRange", "WeeklyOff", "Government", "Religious"
     public DateTime StartDate { get; set; }
     public DateTime? EndDate { get; set; }
-    public int? DayOfWeek { get; set; } // For weekly off: 0=Sunday, 1=Monday, ..., 6=Saturday
+    public string? DaysOfWeek { get; set; } // JSON array string like "[0,6]" for multiple weekly off days
+    public List<int>? DaysOfWeekList { get; set; } // Helper property for frontend (parsed from DaysOfWeek)
     public bool IsRecurring { get; set; }
     public bool IsActive { get; set; }
 }
@@ -24,7 +25,7 @@ public class CreateHolidayRequest
     public string HolidayType { get; set; } = "SingleDay"; // "SingleDay", "DateRange", "WeeklyOff", "Government", "Religious"
     public DateTime StartDate { get; set; }
     public DateTime? EndDate { get; set; } // Required for DateRange type
-    public int? DayOfWeek { get; set; } // Required for WeeklyOff type (0=Sunday, 1=Monday, ..., 6=Saturday)
+    public List<int>? DaysOfWeek { get; set; } // Required for WeeklyOff type - array of day numbers [0,6] for Sunday and Saturday
     public bool IsRecurring { get; set; } = false; // For yearly recurring holidays
 }
 
@@ -36,7 +37,7 @@ public class UpdateHolidayRequest
     public string HolidayType { get; set; } = "SingleDay";
     public DateTime StartDate { get; set; }
     public DateTime? EndDate { get; set; }
-    public int? DayOfWeek { get; set; }
+    public List<int>? DaysOfWeek { get; set; } // Array of day numbers [0,6] for weekly off
     public bool IsRecurring { get; set; }
     public bool IsActive { get; set; }
 }

@@ -20,8 +20,9 @@ public class Holiday : BaseEntity
     // For date range holidays (null for single day)
     public DateTime? EndDate { get; set; }
     
-    // For weekly off days (DayOfWeek: 0=Sunday, 1=Monday, ..., 6=Saturday)
-    public int? DayOfWeek { get; set; } // Null if not a weekly off
+    // For weekly off days - JSON array of day numbers: [0,6] for Sunday and Saturday
+    // DayOfWeek: 0=Sunday, 1=Monday, ..., 6=Saturday
+    public string? DaysOfWeek { get; set; } // JSON array string like "[0,6]" or null if not a weekly off
     
     // If true, holiday repeats every year (for date-based holidays)
     public bool IsRecurring { get; set; } = false;

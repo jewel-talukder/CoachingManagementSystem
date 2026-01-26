@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
 using Microsoft.EntityFrameworkCore;
+using System.Text.Json;
 using CoachingManagementSystem.Application.Features.Holidays.DTOs;
 using CoachingManagementSystem.Application.Interfaces;
 using CoachingManagementSystem.Domain.Entities;
@@ -43,7 +44,7 @@ public class HolidaysController : ControllerBase
                 HolidayType = h.HolidayType,
                 StartDate = h.StartDate,
                 EndDate = h.EndDate,
-                DayOfWeek = h.DayOfWeek,
+                DaysOfWeek = h.DaysOfWeek,
                 IsRecurring = h.IsRecurring,
                 IsActive = h.IsActive
             })
@@ -78,7 +79,10 @@ public class HolidaysController : ControllerBase
             HolidayType = holiday.HolidayType,
             StartDate = holiday.StartDate,
             EndDate = holiday.EndDate,
-            DayOfWeek = holiday.DayOfWeek,
+            DaysOfWeek = holiday.DaysOfWeek,
+            DaysOfWeekList = !string.IsNullOrEmpty(holiday.DaysOfWeek) 
+                ? JsonSerializer.Deserialize<List<int>>(holiday.DaysOfWeek) 
+                : null,
             IsRecurring = holiday.IsRecurring,
             IsActive = holiday.IsActive
         };
@@ -111,9 +115,9 @@ public class HolidaysController : ControllerBase
             return BadRequest(new { message = "End date is required for date range holidays" });
         }
 
-        if (request.HolidayType == "WeeklyOff" && !request.DayOfWeek.HasValue)
+        if (request.HolidayType == "WeeklyOff" && (request.DaysOfWeek == null || request.DaysOfWeek.Count == 0))
         {
-            return BadRequest(new { message = "Day of week is required for weekly off holidays" });
+            return BadRequest(new { message = "At least one day of week is required for weekly off holidays" });
         }
 
         var holiday = new Holiday
@@ -125,7 +129,9 @@ public class HolidaysController : ControllerBase
             HolidayType = request.HolidayType,
             StartDate = request.StartDate.Date, // Store only date part
             EndDate = request.EndDate?.Date, // Store only date part if provided
-            DayOfWeek = request.DayOfWeek,
+            DaysOfWeek = request.DaysOfWeek != null && request.DaysOfWeek.Count > 0 
+                ? JsonSerializer.Serialize(request.DaysOfWeek) 
+                : null,
             IsRecurring = request.IsRecurring,
             IsActive = true,
             CreatedAt = DateTime.UtcNow
@@ -147,7 +153,10 @@ public class HolidaysController : ControllerBase
             HolidayType = holiday.HolidayType,
             StartDate = holiday.StartDate,
             EndDate = holiday.EndDate,
-            DayOfWeek = holiday.DayOfWeek,
+            DaysOfWeek = holiday.DaysOfWeek,
+            DaysOfWeekList = !string.IsNullOrEmpty(holiday.DaysOfWeek) 
+                ? JsonSerializer.Deserialize<List<int>>(holiday.DaysOfWeek) 
+                : null,
             IsRecurring = holiday.IsRecurring,
             IsActive = holiday.IsActive
         };
@@ -186,9 +195,9 @@ public class HolidaysController : ControllerBase
             return BadRequest(new { message = "End date is required for date range holidays" });
         }
 
-        if (request.HolidayType == "WeeklyOff" && !request.DayOfWeek.HasValue)
+        if (request.HolidayType == "WeeklyOff" && (request.DaysOfWeek == null || request.DaysOfWeek.Count == 0))
         {
-            return BadRequest(new { message = "Day of week is required for weekly off holidays" });
+            return BadRequest(new { message = "At least one day of week is required for weekly off holidays" });
         }
 
         holiday.BranchId = request.BranchId;
@@ -197,7 +206,9 @@ public class HolidaysController : ControllerBase
         holiday.HolidayType = request.HolidayType;
         holiday.StartDate = request.StartDate.Date; // Store only date part
         holiday.EndDate = request.EndDate?.Date; // Store only date part if provided
-        holiday.DayOfWeek = request.DayOfWeek;
+        holiday.DaysOfWeek = request.DaysOfWeek != null && request.DaysOfWeek.Count > 0 
+            ? JsonSerializer.Serialize(request.DaysOfWeek) 
+            : null;
         holiday.IsRecurring = request.IsRecurring;
         holiday.IsActive = request.IsActive;
         holiday.UpdatedAt = DateTime.UtcNow;
@@ -217,7 +228,10 @@ public class HolidaysController : ControllerBase
             HolidayType = holiday.HolidayType,
             StartDate = holiday.StartDate,
             EndDate = holiday.EndDate,
-            DayOfWeek = holiday.DayOfWeek,
+            DaysOfWeek = holiday.DaysOfWeek,
+            DaysOfWeekList = !string.IsNullOrEmpty(holiday.DaysOfWeek) 
+                ? JsonSerializer.Deserialize<List<int>>(holiday.DaysOfWeek) 
+                : null,
             IsRecurring = holiday.IsRecurring,
             IsActive = holiday.IsActive
         };

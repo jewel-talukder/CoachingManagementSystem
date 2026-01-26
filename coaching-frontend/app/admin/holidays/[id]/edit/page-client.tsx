@@ -23,7 +23,7 @@ export default function EditHolidayPageClient() {
     holidayType: 'SingleDay',
     startDate: '',
     endDate: '',
-    dayOfWeek: '',
+    daysOfWeek: [] as number[],
     isRecurring: false,
     isActive: true,
   });
@@ -51,6 +51,18 @@ export default function EditHolidayPageClient() {
         formattedEndDate = endDate.toISOString().split('T')[0];
       }
       
+      // Parse days of week from JSON string or use the list if available
+      let daysOfWeekArray: number[] = [];
+      if (holiday.daysOfWeekList && Array.isArray(holiday.daysOfWeekList)) {
+        daysOfWeekArray = holiday.daysOfWeekList;
+      } else if (holiday.daysOfWeek) {
+        try {
+          daysOfWeekArray = JSON.parse(holiday.daysOfWeek);
+        } catch {
+          daysOfWeekArray = [];
+        }
+      }
+
       setFormData({
         branchId: holiday.branchId ? holiday.branchId.toString() : '',
         name: holiday.name || '',
@@ -58,7 +70,7 @@ export default function EditHolidayPageClient() {
         holidayType: holiday.holidayType || 'SingleDay',
         startDate: formattedStartDate,
         endDate: formattedEndDate,
-        dayOfWeek: holiday.dayOfWeek !== null && holiday.dayOfWeek !== undefined ? holiday.dayOfWeek.toString() : '',
+        daysOfWeek: daysOfWeekArray,
         isRecurring: holiday.isRecurring || false,
         isActive: holiday.isActive !== undefined ? holiday.isActive : true,
       });
@@ -99,9 +111,9 @@ export default function EditHolidayPageClient() {
         payload.endDate = formData.endDate;
       }
 
-      // Add day of week for weekly off holidays
-      if (formData.holidayType === 'WeeklyOff' && formData.dayOfWeek) {
-        payload.dayOfWeek = parseInt(formData.dayOfWeek);
+      // Add days of week for weekly off holidays
+      if (formData.holidayType === 'WeeklyOff' && formData.daysOfWeek.length > 0) {
+        payload.daysOfWeek = formData.daysOfWeek;
       }
 
       await holidaysApi.update(holidayId, payload);
@@ -179,7 +191,7 @@ export default function EditHolidayPageClient() {
                   ...formData, 
                   holidayType: e.target.value,
                   endDate: e.target.value !== 'DateRange' ? '' : formData.endDate,
-                  dayOfWeek: e.target.value !== 'WeeklyOff' ? '' : formData.dayOfWeek,
+                  daysOfWeek: e.target.value !== 'WeeklyOff' ? [] : formData.daysOfWeek,
                 });
               }}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
@@ -194,22 +206,42 @@ export default function EditHolidayPageClient() {
 
           {formData.holidayType === 'WeeklyOff' ? (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Day of Week <span className="text-red-500">*</span>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Select Weekly Off Days <span className="text-red-500">*</span>
               </label>
-              <select
-                required
-                value={formData.dayOfWeek}
-                onChange={(e) => setFormData({ ...formData, dayOfWeek: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-              >
-                <option value="">Select Day</option>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 border border-gray-300 rounded-md bg-gray-50">
                 {daysOfWeek.map((day) => (
-                  <option key={day.value} value={day.value}>
-                    {day.label}
-                  </option>
+                  <label key={day.value} className="flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      value={day.value}
+                      checked={formData.daysOfWeek.includes(parseInt(day.value))}
+                      onChange={(e) => {
+                        const dayNum = parseInt(day.value);
+                        if (e.target.checked) {
+                          setFormData({
+                            ...formData,
+                            daysOfWeek: [...formData.daysOfWeek, dayNum].sort((a, b) => a - b),
+                          });
+                        } else {
+                          setFormData({
+                            ...formData,
+                            daysOfWeek: formData.daysOfWeek.filter((d) => d !== dayNum),
+                          });
+                        }
+                      }}
+                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                    />
+                    <span className="ml-2 text-sm text-gray-700">{day.label}</span>
+                  </label>
                 ))}
-              </select>
+              </div>
+              {formData.daysOfWeek.length === 0 && (
+                <p className="mt-1 text-xs text-red-500">Please select at least one day</p>
+              )}
+              <p className="mt-2 text-xs text-gray-500">
+                Selected days will be off every week
+              </p>
             </div>
           ) : (
             <>
