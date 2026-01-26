@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { dashboardApi } from '@/lib/api';
-import { BookOpen, Calendar, Award } from 'lucide-react';
+import { BookOpen, Calendar, Award, DollarSign } from 'lucide-react';
 
 export default function StudentDashboard() {
   const [data, setData] = useState<any>(null);
@@ -47,7 +47,7 @@ export default function StudentDashboard() {
         <div className="px-4 py-6 sm:px-0">
           <h1 className="text-3xl font-bold text-gray-900 mb-6">My Dashboard</h1>
 
-          <div className="grid grid-cols-1 gap-5 sm:grid-cols-3 mb-8">
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-4 mb-8">
             <div className="bg-white overflow-hidden shadow rounded-lg">
               <div className="p-5">
                 <div className="flex items-center">
@@ -95,6 +95,22 @@ export default function StudentDashboard() {
                 </div>
               </div>
             </div>
+
+            <div className="bg-white overflow-hidden shadow rounded-lg">
+              <div className="p-5">
+                <div className="flex items-center">
+                  <div className="bg-yellow-500 rounded-md p-3">
+                    <DollarSign className="h-6 w-6 text-white" />
+                  </div>
+                  <div className="ml-5">
+                    <p className="text-sm font-medium text-gray-500">Payment Due</p>
+                    <p className="text-lg font-medium text-gray-900">
+                      {data?.paymentSummary?.totalDue?.toFixed(2) || '0.00'} Taka
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
@@ -113,6 +129,20 @@ export default function StudentDashboard() {
                       {enrollment.teacherName && (
                         <p className="text-sm text-gray-500">Teacher: {enrollment.teacherName}</p>
                       )}
+                      <div className="mt-3 pt-3 border-t border-gray-200">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-500">Total Fee:</span>
+                          <span className="font-medium">{enrollment.totalFee?.toFixed(2) || '0.00'} Taka</span>
+                        </div>
+                        <div className="flex justify-between text-sm mt-1">
+                          <span className="text-gray-500">Paid:</span>
+                          <span className="font-medium text-green-600">{enrollment.feePaid?.toFixed(2) || '0.00'} Taka</span>
+                        </div>
+                        <div className="flex justify-between text-sm mt-1">
+                          <span className="text-gray-500">Due:</span>
+                          <span className="font-medium text-red-600">{enrollment.feeDue?.toFixed(2) || '0.00'} Taka</span>
+                        </div>
+                      </div>
                     </div>
                   ))}
                 </div>

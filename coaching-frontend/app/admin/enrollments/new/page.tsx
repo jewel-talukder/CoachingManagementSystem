@@ -186,7 +186,7 @@ export default function NewEnrollmentPage() {
             <div>
               <label htmlFor="totalFee" className="block text-sm font-medium text-gray-700">
                 Total Fee (Taka) {batchId && courseId && (
-                  <span className="text-xs text-gray-500">(Auto-calculated)</span>
+                  <span className="text-xs text-gray-500">(Auto-calculated, can be changed)</span>
                 )}
               </label>
               <input
@@ -195,14 +195,11 @@ export default function NewEnrollmentPage() {
                 id="totalFee"
                 step="0.01"
                 min="0"
-                readOnly={batchId && courseId ? true : false}
-                className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-3 py-2 border ${
-                  batchId && courseId ? 'bg-gray-50 cursor-not-allowed' : ''
-                }`}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-3 py-2 border"
               />
               {batchId && courseId && (
                 <p className="mt-1 text-xs text-gray-500">
-                  Calculated as: Batch Monthly Fee × Course Duration
+                  Auto-calculated as: Batch Monthly Fee × Course Duration. You can modify if needed.
                 </p>
               )}
             </div>

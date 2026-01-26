@@ -91,13 +91,34 @@ public class UsersController : ControllerBase
         if (coachingId == null)
             return Unauthorized();
 
-        // Check if email already exists
-        var emailExists = await _context.Users
-            .AnyAsync(u => u.Email == request.Email && !u.IsDeleted);
-
-        if (emailExists)
+        // Check if email already exists (only if email is provided)
+        if (!string.IsNullOrWhiteSpace(request.Email))
         {
-            return BadRequest(new { message = "Email already exists" });
+            var emailExists = await _context.Users
+                .AnyAsync(u => u.Email == request.Email && !u.IsDeleted);
+
+            if (emailExists)
+            {
+                return BadRequest(new { message = "Email already exists" });
+            }
+        }
+
+        // For students, phone is required if email is not provided
+        if (request.UserType == "Student" && string.IsNullOrWhiteSpace(request.Email) && string.IsNullOrWhiteSpace(request.Phone))
+        {
+            return BadRequest(new { message = "Phone number is required for students when email is not provided" });
+        }
+
+        // Check if phone already exists (only if phone is provided and email is not)
+        if (!string.IsNullOrWhiteSpace(request.Phone) && string.IsNullOrWhiteSpace(request.Email))
+        {
+            var phoneExists = await _context.Users
+                .AnyAsync(u => u.Phone == request.Phone && !u.IsDeleted);
+
+            if (phoneExists)
+            {
+                return BadRequest(new { message = "Phone number already exists" });
+            }
         }
 
         // Verify roles exist

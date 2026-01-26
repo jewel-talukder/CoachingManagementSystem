@@ -68,21 +68,25 @@ export default function EditEnrollmentPageClient() {
         <form onSubmit={handleSubmit} className="bg-white shadow rounded-lg p-6 space-y-6">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Total Fee</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Total Fee (Taka)</label>
               <input
                 type="number"
+                step="0.01"
+                min="0"
                 value={formData.totalFee}
                 onChange={(e) => setFormData({ ...formData, totalFee: parseFloat(e.target.value) || 0 })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Fee Paid</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Fee Paid (Taka)</label>
               <input
                 type="number"
+                step="0.01"
+                min="0"
                 value={formData.feePaid}
                 onChange={(e) => setFormData({ ...formData, feePaid: parseFloat(e.target.value) || 0 })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
               />
             </div>
           </div>

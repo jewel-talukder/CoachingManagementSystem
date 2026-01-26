@@ -9,7 +9,7 @@ import { useAuthStore } from '@/lib/store/authStore';
 import { useRouter } from 'next/navigation';
 
 const loginSchema = z.object({
-  email: z.string().email('Invalid email address'),
+  username: z.string().min(1, 'Username is required'),
   password: z.string().min(6, 'Password must be at least 6 characters'),
 });
 
@@ -34,7 +34,7 @@ export default function LoginForm() {
     setLoading(true);
 
     try {
-      const response = await authApi.login(data.email, data.password);
+      const response = await authApi.login(data.username, data.password);
       const { token, user } = response.data;
 
       setAuth(user, token);
@@ -67,18 +67,18 @@ export default function LoginForm() {
       )}
 
       <div>
-        <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-          Email
+        <label htmlFor="username" className="block text-sm font-medium text-gray-700">
+          Username (Email or Phone)
         </label>
         <input
-          {...register('email')}
-          type="email"
-          id="email"
+          {...register('username')}
+          type="text"
+          id="username"
           className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-3 py-2 border"
-          placeholder="Enter your email"
+          placeholder="Enter your email or phone number"
         />
-        {errors.email && (
-          <p className="mt-1 text-sm text-red-600">{errors.email.message}</p>
+        {errors.username && (
+          <p className="mt-1 text-sm text-red-600">{errors.username.message}</p>
         )}
       </div>
 

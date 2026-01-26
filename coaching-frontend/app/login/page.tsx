@@ -12,7 +12,7 @@ export default function LoginPage() {
   const { setAuth } = useAuthStore();
   const { addToast } = useToastStore();
   const [formData, setFormData] = useState({
-    email: "",
+    username: "",
     password: "",
   });
   const [error, setError] = useState("");
@@ -25,7 +25,7 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const response = await authApi.login(formData.email, formData.password);
+      const response = await authApi.login(formData.username, formData.password);
       const { token, user } = response.data;
 
       // Store authentication data
@@ -51,7 +51,7 @@ export default function LoginPage() {
       }, 500);
     } catch (err: any) {
       // Handle error response
-      const errorMessage = err.response?.data?.message || "Invalid email or password";
+      const errorMessage = err.response?.data?.message || "Invalid username or password";
       setError(errorMessage);
       addToast(errorMessage, "error");
     } finally {
@@ -85,17 +85,17 @@ export default function LoginPage() {
 
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-                Email Address
+              <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-2">
+                Username (Email or Phone)
               </label>
               <input
-                id="email"
-                type="email"
+                id="username"
+                type="text"
                 required
-                value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                value={formData.username}
+                onChange={(e) => setFormData({ ...formData, username: e.target.value })}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
-                placeholder="you@example.com"
+                placeholder="Enter email or phone number"
               />
             </div>
 

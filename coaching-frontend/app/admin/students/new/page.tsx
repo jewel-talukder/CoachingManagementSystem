@@ -21,6 +21,7 @@ export default function NewStudentPage() {
   const [batches, setBatches] = useState<any[]>([]);
   const [paymentDue, setPaymentDue] = useState<number | null>(null);
   const [enableEnrollment, setEnableEnrollment] = useState(false);
+  const [enrollmentType, setEnrollmentType] = useState<'course' | 'batch' | null>(null);
 
   const [formData, setFormData] = useState({
     branchId: selectedBranch?.id?.toString() || '',
@@ -53,21 +54,26 @@ export default function NewStudentPage() {
   }, [selectedBranch]);
 
   useEffect(() => {
-    if (enableEnrollment) {
-      fetchBatches();
+    if (enableEnrollment && enrollmentType) {
+      if (enrollmentType === 'batch') {
+        fetchBatches();
+      } else if (enrollmentType === 'course') {
+        // For course-wise, we'll fetch batches when course is selected
+        setBatches([]);
+      }
     } else {
       setBatches([]);
     }
-  }, [enableEnrollment]);
+  }, [enableEnrollment, enrollmentType]);
 
   useEffect(() => {
-    if (enableEnrollment) {
+    if (enableEnrollment && enrollmentType) {
       calculatePaymentDue();
     } else {
       setPaymentDue(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enableEnrollment, formData.courseId, formData.batchId, formData.totalFee, formData.feePaid, paymentMode, courses.length, batches.length]);
+  }, [enableEnrollment, enrollmentType, formData.courseId, formData.batchId, formData.totalFee, formData.feePaid, paymentMode, courses.length, batches.length]);
 
   const fetchBranches = async () => {
     try {
@@ -128,54 +134,104 @@ export default function NewStudentPage() {
     }
   };
 
-  // Auto-calculate TotalFee when batch and course are selected
+  // Fetch batches when course is selected (for course-wise enrollment)
   useEffect(() => {
-    if (enableEnrollment && formData.courseId && formData.batchId && courses.length > 0 && batches.length > 0) {
+    if (enrollmentType === 'course' && formData.courseId) {
+      // For course-wise, fetch all batches (needed for auto-selection in background)
+      fetchBatches();
+    }
+  }, [enrollmentType, formData.courseId]);
+
+  // Fetch courses when batch is selected (for batch-wise enrollment)
+  useEffect(() => {
+    if (enrollmentType === 'batch' && formData.batchId) {
+      // Courses are already loaded, just ensure they're available
+    }
+  }, [enrollmentType, formData.batchId]);
+
+  // Auto-calculate TotalFee based on enrollment type
+  useEffect(() => {
+    if (!enableEnrollment || !enrollmentType) {
+      setFormData((prev) => ({ ...prev, totalFee: '' }));
+      return;
+    }
+
+    if (enrollmentType === 'course' && formData.courseId) {
+      // Course-wise: Use course fee only
       const courseId = parseInt(formData.courseId);
-      const batchId = parseInt(formData.batchId);
-
-      if (!isNaN(courseId) && !isNaN(batchId)) {
+      if (!isNaN(courseId)) {
         const course = courses.find((c) => c.id === courseId);
+        if (course && course.fee) {
+          setFormData((prev) => ({ ...prev, totalFee: course.fee.toFixed(2) }));
+        }
+      }
+    } else if (enrollmentType === 'batch' && formData.batchId) {
+      // Batch-wise: Use batch monthly fee only (no course shown to user)
+      const batchId = parseInt(formData.batchId);
+      if (!isNaN(batchId)) {
         const batch = batches.find((b) => b.id === batchId);
-
-        if (course && batch && batch.monthlyFee && course.durationMonths) {
-          // Calculate: Batch MonthlyFee × Course DurationMonths
-          const calculatedTotalFee = batch.monthlyFee * course.durationMonths;
-          setFormData((prev) => ({ ...prev, totalFee: calculatedTotalFee.toFixed(2) }));
+        if (batch && batch.monthlyFee) {
+          // For batch-wise, use monthly fee as total
+          setFormData((prev) => ({ ...prev, totalFee: batch.monthlyFee.toFixed(2) }));
         }
       }
     }
-  }, [formData.courseId, formData.batchId, courses, batches, enableEnrollment]);
+  }, [enrollmentType, formData.courseId, formData.batchId, courses, batches, enableEnrollment]);
+
+  // Auto-select missing field in background (required by API but not shown to user)
+  useEffect(() => {
+    if (!enableEnrollment || !enrollmentType) return;
+
+    if (enrollmentType === 'course' && formData.courseId && !formData.batchId && batches.length > 0) {
+      // Auto-select first batch in background for course-wise
+      setFormData((prev) => ({ ...prev, batchId: batches[0].id.toString() }));
+    } else if (enrollmentType === 'batch' && formData.batchId && !formData.courseId && courses.length > 0) {
+      // Auto-select first course in background for batch-wise
+      setFormData((prev) => ({ ...prev, courseId: courses[0].id.toString() }));
+    }
+  }, [enrollmentType, formData.courseId, formData.batchId, courses, batches, enableEnrollment]);
 
   const calculatePaymentDue = () => {
-    if (!formData.courseId || !formData.batchId || courses.length === 0 || batches.length === 0) {
+    if (!enableEnrollment || !enrollmentType) {
       setPaymentDue(null);
       return;
     }
 
     try {
-      const courseId = parseInt(formData.courseId);
-      const batchId = parseInt(formData.batchId);
-
-      if (isNaN(courseId) || isNaN(batchId)) {
-        setPaymentDue(null);
-        return;
-      }
-
-      const course = courses.find((c) => c.id === courseId);
-      const batch = batches.find((b) => b.id === batchId);
-
-      if (course && batch) {
-        const totalFee = parseFloat(formData.totalFee) || 0;
-        const feePaid = parseFloat(formData.feePaid) || 0;
-
-        if (paymentMode === 'monthly') {
-          // For monthly: calculate monthly fee from batch monthly fee
-          const monthlyFee = batch.monthlyFee || 0;
-          setPaymentDue(Math.max(0, monthlyFee - feePaid));
-        } else {
-          // For batch-wise: show total fee minus paid
+      if (enrollmentType === 'course' && formData.courseId) {
+        const courseId = parseInt(formData.courseId);
+        if (isNaN(courseId)) {
+          setPaymentDue(null);
+          return;
+        }
+        const course = courses.find((c) => c.id === courseId);
+        if (course) {
+          const totalFee = parseFloat(formData.totalFee) || 0;
+          const feePaid = parseFloat(formData.feePaid) || 0;
           setPaymentDue(Math.max(0, totalFee - feePaid));
+        } else {
+          setPaymentDue(null);
+        }
+      } else if (enrollmentType === 'batch' && formData.batchId) {
+        const batchId = parseInt(formData.batchId);
+        if (isNaN(batchId)) {
+          setPaymentDue(null);
+          return;
+        }
+        const batch = batches.find((b) => b.id === batchId);
+        if (batch) {
+          const totalFee = parseFloat(formData.totalFee) || 0;
+          const feePaid = parseFloat(formData.feePaid) || 0;
+          if (paymentMode === 'monthly') {
+            // For monthly: calculate monthly fee from batch monthly fee
+            const monthlyFee = batch.monthlyFee || 0;
+            setPaymentDue(Math.max(0, monthlyFee - feePaid));
+          } else {
+            // For batch-wise: show total fee minus paid
+            setPaymentDue(Math.max(0, totalFee - feePaid));
+          }
+        } else {
+          setPaymentDue(null);
         }
       } else {
         setPaymentDue(null);
@@ -215,19 +271,51 @@ export default function NewStudentPage() {
         throw new Error('Failed to get student ID from response');
       }
 
-      // Create enrollment if enabled and course and batch are selected
-      if (enableEnrollment && formData.courseId && formData.batchId) {
-        const courseId = parseInt(formData.courseId);
-        const batchId = parseInt(formData.batchId);
-        
-        if (isNaN(courseId) || isNaN(batchId)) {
+      // Create enrollment if enabled and enrollment type is selected with required fields
+      if (enableEnrollment && enrollmentType) {
+        let finalCourseId: number;
+        let finalBatchId: number;
+
+        if (enrollmentType === 'course' && formData.courseId) {
+          finalCourseId = parseInt(formData.courseId);
+          if (isNaN(finalCourseId)) {
+            throw new Error('Invalid course ID');
+          }
+          // For course-wise, use auto-selected batch (should be set by useEffect)
+          if (!formData.batchId) {
+            if (batches.length === 0) {
+              throw new Error('No batches available for enrollment');
+            }
+            finalBatchId = batches[0].id;
+          } else {
+            finalBatchId = parseInt(formData.batchId);
+          }
+        } else if (enrollmentType === 'batch' && formData.batchId) {
+          finalBatchId = parseInt(formData.batchId);
+          if (isNaN(finalBatchId)) {
+            throw new Error('Invalid batch ID');
+          }
+          // For batch-wise, use auto-selected course (should be set by useEffect)
+          if (!formData.courseId) {
+            if (courses.length === 0) {
+              throw new Error('No courses available for enrollment');
+            }
+            finalCourseId = courses[0].id;
+          } else {
+            finalCourseId = parseInt(formData.courseId);
+          }
+        } else {
+          throw new Error('Please select course or batch for enrollment');
+        }
+
+        if (isNaN(finalCourseId!) || isNaN(finalBatchId!)) {
           throw new Error('Invalid course or batch ID');
         }
 
         await enrollmentsApi.create({
           studentId: studentId,
-          courseId: courseId,
-          batchId: batchId,
+          courseId: finalCourseId!,
+          batchId: finalBatchId!,
           totalFee: formData.totalFee ? parseFloat(formData.totalFee) : null,
           feePaid: formData.feePaid ? parseFloat(formData.feePaid) : null,
         });
@@ -315,15 +403,19 @@ export default function NewStudentPage() {
                 <div className="grid grid-cols-2 gap-4 mt-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Email <span className="text-red-500">*</span>
+                      Phone <span className="text-red-500">*</span>
                     </label>
                     <input
-                      type="email"
+                      type="tel"
                       required
-                      value={formData.email}
-                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                      value={formData.phone}
+                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="01XXXXXXXXX"
                     />
+                    <p className="mt-1 text-xs text-gray-500">
+                      Phone number will be used as username for login
+                    </p>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -341,12 +433,15 @@ export default function NewStudentPage() {
 
                 <div className="grid grid-cols-2 gap-4 mt-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Email (Optional)
+                    </label>
                     <input
-                      type="tel"
-                      value={formData.phone}
-                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                      type="email"
+                      value={formData.email}
+                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="optional@example.com"
                     />
                   </div>
                   <div>
@@ -404,6 +499,8 @@ export default function NewStudentPage() {
                         if (!e.target.checked) {
                           // Clear enrollment fields when unchecked
                           setFormData({ ...formData, courseId: '', batchId: '', totalFee: '', feePaid: '' });
+                          setEnrollmentType(null);
+                          setBatches([]);
                         }
                       }}
                       className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
@@ -414,76 +511,134 @@ export default function NewStudentPage() {
                 
                 {enableEnrollment ? (
                   <div className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Course</label>
-                    <select
-                      value={formData.courseId}
-                      onChange={(e) => {
-                        setFormData({ ...formData, courseId: e.target.value });
-                      }}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                    >
-                      <option value="">Select Course</option>
-                      {courses.map((course) => (
-                        <option key={course.id} value={course.id}>
-                          {course.name} {course.durationMonths ? `(${course.durationMonths} months)` : ''}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Batch</label>
-                    <select
-                      value={formData.batchId}
-                      onChange={(e) => setFormData({ ...formData, batchId: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                    >
-                      <option value="">Select Batch</option>
-                      {batches.map((batch) => (
-                        <option key={batch.id} value={batch.id}>
-                          {batch.name} ({batch.currentStudents}/{batch.maxStudents})
-                          {batch.monthlyFee ? ` - ${batch.monthlyFee} Taka/month` : ''}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                    {/* Enrollment Type Selection */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Enrollment Type *
+                      </label>
+                      <div className="flex gap-4">
+                        <label className="flex items-center space-x-2 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="enrollmentType"
+                            value="course"
+                            checked={enrollmentType === 'course'}
+                            onChange={(e) => {
+                              setEnrollmentType('course');
+                              setFormData({ ...formData, courseId: '', batchId: '', totalFee: '', feePaid: '' });
+                              setBatches([]);
+                            }}
+                            className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                          />
+                          <span className="text-sm text-gray-700">Course Wise</span>
+                        </label>
+                        <label className="flex items-center space-x-2 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="enrollmentType"
+                            value="batch"
+                            checked={enrollmentType === 'batch'}
+                            onChange={(e) => {
+                              setEnrollmentType('batch');
+                              setFormData({ ...formData, courseId: '', batchId: '', totalFee: '', feePaid: '' });
+                            }}
+                            className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                          />
+                          <span className="text-sm text-gray-700">Batch Wise</span>
+                        </label>
+                      </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4 mt-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Total Fee (Taka) {formData.courseId && formData.batchId && (
-                            <span className="text-xs text-gray-500">(Auto-calculated)</span>
+                    {/* Course Wise Enrollment */}
+                    {enrollmentType === 'course' && (
+                      <div className="space-y-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Course *
+                          </label>
+                          <select
+                            value={formData.courseId}
+                            onChange={(e) => {
+                              setFormData({ ...formData, courseId: e.target.value, batchId: '', totalFee: '' });
+                            }}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                          >
+                            <option value="">Select Course</option>
+                            {courses.map((course) => (
+                              <option key={course.id} value={course.id}>
+                                {course.name} {course.durationMonths ? `(${course.durationMonths} months)` : ''}
+                                {course.fee ? ` - ${course.fee} Taka` : ''}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Batch Wise Enrollment */}
+                    {enrollmentType === 'batch' && (
+                      <div className="space-y-4 p-4 bg-green-50 rounded-lg border border-green-200">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Batch *
+                          </label>
+                          <select
+                            value={formData.batchId}
+                            onChange={(e) => {
+                              setFormData({ ...formData, batchId: e.target.value, courseId: '', totalFee: '' });
+                            }}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                          >
+                            <option value="">Select Batch</option>
+                            {batches.map((batch) => (
+                              <option key={batch.id} value={batch.id}>
+                                {batch.name} ({batch.currentStudents}/{batch.maxStudents})
+                                {batch.monthlyFee ? ` - ${batch.monthlyFee} Taka/month` : ''}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                    )}
+
+                    {(enrollmentType === 'course' && formData.courseId) || 
+                     (enrollmentType === 'batch' && formData.batchId) ? (
+                      <div className="grid grid-cols-2 gap-4 mt-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Total Fee (Taka) <span className="text-xs text-gray-500">(Auto-calculated, can be changed)</span>
+                          </label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={formData.totalFee}
+                            onChange={(e) => setFormData({ ...formData, totalFee: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                          />
+                          {enrollmentType === 'course' && (
+                            <p className="mt-1 text-xs text-gray-500">
+                              Auto-calculated from course fee. You can modify if needed.
+                            </p>
                           )}
-                        </label>
-                        <input
-                          type="number"
-                          step="0.01"
-                          value={formData.totalFee}
-                          onChange={(e) => setFormData({ ...formData, totalFee: e.target.value })}
-                          readOnly={formData.courseId && formData.batchId ? true : false}
-                          className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 ${
-                            formData.courseId && formData.batchId ? 'bg-gray-50 cursor-not-allowed' : ''
-                          }`}
-                        />
-                        {formData.courseId && formData.batchId && (
-                          <p className="mt-1 text-xs text-gray-500">
-                            Calculated as: Batch Monthly Fee × Course Duration
-                          </p>
-                        )}
+                          {enrollmentType === 'batch' && (
+                            <p className="mt-1 text-xs text-gray-500">
+                              Auto-calculated from batch monthly fee. You can modify if needed.
+                            </p>
+                          )}
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Fee Paid (Taka)</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={formData.feePaid}
+                            onChange={(e) => setFormData({ ...formData, feePaid: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                          />
+                        </div>
                       </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Fee Paid (Taka)</label>
-                        <input
-                          type="number"
-                          step="0.01"
-                          value={formData.feePaid}
-                          onChange={(e) => setFormData({ ...formData, feePaid: e.target.value })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                        />
-                      </div>
-                    </div>
+                    ) : null}
                   </div>
                 ) : (
                   <div className="p-4 bg-gray-50 rounded-lg text-center text-sm text-gray-500">
@@ -518,7 +673,7 @@ export default function NewStudentPage() {
                   <div className="text-lg font-semibold text-blue-900 capitalize">{paymentMode}</div>
                 </div>
 
-                {enableEnrollment && paymentDue !== null ? (
+                {enableEnrollment && enrollmentType && paymentDue !== null ? (
                   <>
                     <div className="p-4 bg-yellow-50 rounded-lg border-2 border-yellow-200">
                       <div className="text-sm text-gray-600 mb-1 flex items-center">
@@ -548,9 +703,15 @@ export default function NewStudentPage() {
                       </div>
                     )}
                   </>
+                ) : enableEnrollment && enrollmentType ? (
+                  <div className="p-4 bg-gray-50 rounded-lg text-center text-sm text-gray-500">
+                    {enrollmentType === 'course' 
+                      ? 'Select course and batch to calculate payment due'
+                      : 'Select batch and course to calculate payment due'}
+                  </div>
                 ) : enableEnrollment ? (
                   <div className="p-4 bg-gray-50 rounded-lg text-center text-sm text-gray-500">
-                    Select course and batch to calculate payment due
+                    Select enrollment type (Course Wise or Batch Wise)
                   </div>
                 ) : (
                   <div className="p-4 bg-gray-50 rounded-lg text-center text-sm text-gray-500">

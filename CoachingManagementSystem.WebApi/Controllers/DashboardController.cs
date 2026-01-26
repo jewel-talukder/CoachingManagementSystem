@@ -158,6 +158,9 @@ public class DashboardController : ControllerBase
                     ? $"{e.Batch.Teacher.User.FirstName} {e.Batch.Teacher.User.LastName}" 
                     : null,
                 EnrollmentDate = e.EnrollmentDate,
+                TotalFee = e.TotalFee,
+                FeePaid = e.FeePaid,
+                FeeDue = e.TotalFee - e.FeePaid,
                 BatchSchedule = new
                 {
                     StartTime = e.Batch.StartTime,
@@ -201,6 +204,11 @@ public class DashboardController : ControllerBase
             })
             .ToListAsync();
 
+        // Calculate total payment summary
+        var totalFee = enrollments.Sum(e => e.TotalFee ?? 0);
+        var totalPaid = enrollments.Sum(e => e.FeePaid ?? 0);
+        var totalDue = totalFee - totalPaid;
+
         return Ok(new
         {
             Enrollments = enrollments,
@@ -210,7 +218,13 @@ public class DashboardController : ControllerBase
                 Present = presentCount,
                 Percentage = Math.Round(attendancePercentage, 2)
             },
-            UpcomingExams = upcomingExams
+            UpcomingExams = upcomingExams,
+            PaymentSummary = new
+            {
+                TotalFee = totalFee,
+                TotalPaid = totalPaid,
+                TotalDue = totalDue
+            }
         });
     }
 

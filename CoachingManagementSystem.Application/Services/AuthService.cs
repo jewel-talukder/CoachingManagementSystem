@@ -19,15 +19,22 @@ public class AuthService : IAuthService
 
     public async Task<LoginResponse> LoginAsync(LoginRequest request)
     {
+        // Support login with email or phone number (username)
+        // Check if request has Username (phone) or Email
+        var loginIdentifier = !string.IsNullOrWhiteSpace(request.Username) 
+            ? request.Username 
+            : request.Email;
+
         var user = await _context.Users
             .Include(u => u.UserRoles)
                 .ThenInclude(ur => ur.Role)
             .Include(u => u.Coaching)
-            .FirstOrDefaultAsync(u => u.Email == request.Email && !u.IsDeleted);
+            .FirstOrDefaultAsync(u => 
+                (u.Email == loginIdentifier || u.Phone == loginIdentifier) && !u.IsDeleted);
 
         if (user == null || !BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
         {
-            throw new UnauthorizedAccessException("Invalid email or password");
+            throw new UnauthorizedAccessException("Invalid username/email or password");
         }
 
         if (!user.IsActive)

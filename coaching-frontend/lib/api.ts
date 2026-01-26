@@ -90,8 +90,8 @@ api.interceptors.response.use(
 
 // Auth API
 export const authApi = {
-  login: (email: string, password: string) =>
-    api.post('/auth/login', { email, password }),
+  login: (username: string, password: string) =>
+    api.post('/auth/login', { username, password }),
   registerCoaching: (data: any) =>
     api.post('/auth/register-coaching', data),
   getFirstPlan: (billingPeriod?: string) =>
