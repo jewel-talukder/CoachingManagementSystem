@@ -39,8 +39,9 @@ export default function StudentsPage() {
   const filteredStudents = students.filter((student) => {
     const fullName = `${student.firstName} ${student.lastName}`.toLowerCase();
     const email = student.email?.toLowerCase() || '';
+    const phone = student.phone?.toLowerCase() || '';
     const search = searchTerm.toLowerCase();
-    return fullName.includes(search) || email.includes(search);
+    return fullName.includes(search) || email.includes(search) || phone.includes(search);
   });
 
   // Get student enrollments
@@ -142,7 +143,7 @@ export default function StudentsPage() {
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
             <input
               type="text"
-              placeholder="Search students by name or email..."
+              placeholder="Search students by name, email, or phone..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
@@ -193,8 +194,8 @@ export default function StudentsPage() {
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {student.email}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {student.phone || '-'}
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">
+                      {student.phone || <span className="text-gray-400">-</span>}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
                       {(() => {

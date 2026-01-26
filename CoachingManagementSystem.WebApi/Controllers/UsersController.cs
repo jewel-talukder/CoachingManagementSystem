@@ -58,7 +58,22 @@ public class UsersController : ControllerBase
 
         if (!string.IsNullOrEmpty(role))
         {
-            usersQuery = usersQuery.Where(u => u.UserRoles.Any(ur => ur.Role.Name == role));
+            if (role == "Student")
+            {
+                // For students, check both UserRoles and Student table
+                var studentUserIds = await _context.Students
+                    .Where(s => s.CoachingId == coachingId.Value && !s.IsDeleted)
+                    .Select(s => s.UserId)
+                    .ToListAsync();
+                
+                usersQuery = usersQuery.Where(u => 
+                    u.UserRoles.Any(ur => ur.Role.Name == role) || 
+                    studentUserIds.Contains(u.Id));
+            }
+            else
+            {
+                usersQuery = usersQuery.Where(u => u.UserRoles.Any(ur => ur.Role.Name == role));
+            }
         }
 
         if (isActive.HasValue)
@@ -303,6 +318,7 @@ public class UsersController : ControllerBase
             UserType = student != null ? "Student" : teacher != null ? "Teacher" : null,
             AdditionalData = student != null ? new Dictionary<string, object>
             {
+                ["BranchId"] = student.BranchId.ToString(),
                 ["StudentCode"] = student.StudentCode ?? string.Empty,
                 ["DateOfBirth"] = student.DateOfBirth?.ToString("yyyy-MM-dd") ?? string.Empty,
                 ["ParentName"] = student.ParentName ?? string.Empty,
@@ -310,6 +326,7 @@ public class UsersController : ControllerBase
                 ["Address"] = student.Address ?? string.Empty
             } : teacher != null ? new Dictionary<string, object>
             {
+                ["BranchId"] = teacher.BranchId.ToString(),
                 ["EmployeeCode"] = teacher.EmployeeCode ?? string.Empty,
                 ["QualificationId"] = teacher.QualificationId?.ToString() ?? string.Empty,
                 ["QualificationName"] = teacher.Qualification?.Name ?? string.Empty,
@@ -344,6 +361,12 @@ public class UsersController : ControllerBase
         user.IsActive = request.IsActive;
         user.UpdatedAt = DateTime.UtcNow;
 
+        // Update password if provided
+        if (!string.IsNullOrWhiteSpace(request.Password))
+        {
+            user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password);
+        }
+
         // Update roles
         var existingRoles = await _context.UserRoles
             .Where(ur => ur.UserId == id)
@@ -373,6 +396,19 @@ public class UsersController : ControllerBase
 
             if (student != null)
             {
+                if (request.AdditionalData.ContainsKey("BranchId"))
+                {
+                    var branchIdStr = request.AdditionalData["BranchId"]?.ToString();
+                    if (int.TryParse(branchIdStr, out var branchId) && branchId > 0)
+                    {
+                        var branch = await _context.Branches
+                            .FirstOrDefaultAsync(b => b.Id == branchId && b.CoachingId == coachingId.Value && !b.IsDeleted);
+                        if (branch != null)
+                        {
+                            student.BranchId = branchId;
+                        }
+                    }
+                }
                 student.StudentCode = request.AdditionalData.ContainsKey("StudentCode") 
                     ? request.AdditionalData["StudentCode"]?.ToString() 
                     : student.StudentCode;
@@ -399,6 +435,19 @@ public class UsersController : ControllerBase
 
             if (teacher != null)
             {
+                if (request.AdditionalData.ContainsKey("BranchId"))
+                {
+                    var branchIdStr = request.AdditionalData["BranchId"]?.ToString();
+                    if (int.TryParse(branchIdStr, out var branchId) && branchId > 0)
+                    {
+                        var branch = await _context.Branches
+                            .FirstOrDefaultAsync(b => b.Id == branchId && b.CoachingId == coachingId.Value && !b.IsDeleted);
+                        if (branch != null)
+                        {
+                            teacher.BranchId = branchId;
+                        }
+                    }
+                }
                 teacher.EmployeeCode = request.AdditionalData.ContainsKey("EmployeeCode") 
                     ? request.AdditionalData["EmployeeCode"]?.ToString() 
                     : teacher.EmployeeCode;

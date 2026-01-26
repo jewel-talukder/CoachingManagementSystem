@@ -213,6 +213,15 @@ export const specializationsApi = {
   delete: (id: number) => api.delete(`/specializations/${id}`),
 };
 
+// Holidays API
+export const holidaysApi = {
+  getAll: () => api.get('/holidays'),
+  getById: (id: number) => api.get(`/holidays/${id}`),
+  create: (data: any) => api.post('/holidays', data),
+  update: (id: number, data: any) => api.put(`/holidays/${id}`, data),
+  delete: (id: number) => api.delete(`/holidays/${id}`),
+};
+
 // Super Admin API
 export const superAdminApi = {
   getDashboard: () => api.get('/superadmin/dashboard'),

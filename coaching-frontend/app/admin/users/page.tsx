@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import AdminLayout from '@/components/layouts/AdminLayout';
 import { usersApi } from '@/lib/api';
-import { Plus } from 'lucide-react';
+import { Plus, Edit } from 'lucide-react';
 import Link from 'next/link';
 
 export default function UsersPage() {
@@ -68,36 +68,56 @@ export default function UsersPage() {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Status
                 </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Actions
+                </th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {users.map((user) => (
-                <tr key={user.id}>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                    {user.firstName} {user.lastName}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {user.email}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {user.phone || '-'}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {user.roles.join(', ')}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span
-                      className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                        user.isActive
-                          ? 'bg-green-100 text-green-800'
-                          : 'bg-red-100 text-red-800'
-                      }`}
-                    >
-                      {user.isActive ? 'Active' : 'Inactive'}
-                    </span>
+              {users.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-6 py-4 text-center text-sm text-gray-500">
+                    No users found.
                   </td>
                 </tr>
-              ))}
+              ) : (
+                users.map((user) => (
+                  <tr key={user.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                      {user.firstName} {user.lastName}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {user.email}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {user.phone || '-'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {user.roles.join(', ')}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span
+                        className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                          user.isActive
+                            ? 'bg-green-100 text-green-800'
+                            : 'bg-red-100 text-red-800'
+                        }`}
+                      >
+                        {user.isActive ? 'Active' : 'Inactive'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                      <Link
+                        href={`/admin/users/${user.id}/edit`}
+                        className="text-blue-600 hover:text-blue-900"
+                        title="Edit user"
+                      >
+                        <Edit className="h-5 w-5" />
+                      </Link>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>

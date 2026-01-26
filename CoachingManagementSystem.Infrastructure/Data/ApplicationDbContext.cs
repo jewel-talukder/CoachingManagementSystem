@@ -28,6 +28,7 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<Plan> Plans { get; set; }
     public DbSet<Subscription> Subscriptions { get; set; }
     public DbSet<UsageLog> UsageLogs { get; set; }
+    public DbSet<Holiday> Holidays { get; set; }
     public DbSet<Qualification> Qualifications { get; set; }
     public DbSet<Specialization> Specializations { get; set; }
 
@@ -258,6 +259,18 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
             .HasForeignKey(u => u.CoachingId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        modelBuilder.Entity<Holiday>()
+            .HasOne(h => h.Coaching)
+            .WithMany()
+            .HasForeignKey(h => h.CoachingId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<Holiday>()
+            .HasOne(h => h.Branch)
+            .WithMany()
+            .HasForeignKey(h => h.BranchId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         // Soft delete filter
         modelBuilder.Entity<Coaching>().HasQueryFilter(c => !c.IsDeleted);
         modelBuilder.Entity<Branch>().HasQueryFilter(b => !b.IsDeleted);
@@ -270,6 +283,7 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
         modelBuilder.Entity<Plan>().HasQueryFilter(p => !p.IsDeleted);
         modelBuilder.Entity<Qualification>().HasQueryFilter(q => !q.IsDeleted);
         modelBuilder.Entity<Specialization>().HasQueryFilter(s => !s.IsDeleted);
+        modelBuilder.Entity<Holiday>().HasQueryFilter(h => !h.IsDeleted);
     }
 }
 

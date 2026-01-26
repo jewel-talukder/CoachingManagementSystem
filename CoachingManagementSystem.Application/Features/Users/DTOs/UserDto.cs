@@ -29,6 +29,7 @@ public class UpdateUserRequest
     public string FirstName { get; set; } = string.Empty;
     public string LastName { get; set; } = string.Empty;
     public string? Phone { get; set; }
+    public string? Password { get; set; } // Optional - only update if provided
     public bool IsActive { get; set; }
     public List<int> RoleIds { get; set; } = new();
     public string? UserType { get; set; } // "Teacher" or "Student"
