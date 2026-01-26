@@ -68,8 +68,20 @@ export default function BatchesPage() {
         </div>
 
         <div className="bg-white shadow overflow-hidden sm:rounded-md">
-          <ul className="divide-y divide-gray-200">
-            {batches.map((batch) => (
+          {batches.length === 0 ? (
+            <div className="text-center py-12">
+              <p className="text-gray-500">No batches found</p>
+              <Link
+                href="/admin/batches/new"
+                className="mt-4 inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
+              >
+                <Plus className="h-5 w-5 mr-2" />
+                Create First Batch
+              </Link>
+            </div>
+          ) : (
+            <ul className="divide-y divide-gray-200">
+              {batches.map((batch) => (
               <li key={batch.id}>
                 <div className="px-4 py-4 sm:px-6 hover:bg-gray-50">
                   <div className="flex items-center justify-between">
@@ -133,8 +145,9 @@ export default function BatchesPage() {
                   </div>
                 </div>
               </li>
-            ))}
-          </ul>
+              ))}
+            </ul>
+          )}
         </div>
       </div>
     </AdminLayout>
