@@ -78,13 +78,13 @@ export default function NewStudentPage() {
   const fetchBranches = async () => {
     try {
       const response = await branchesApi.getAll();
-      const branchesData = Array.isArray(response.data) 
-        ? response.data 
-        : Array.isArray(response.data?.data) 
-        ? response.data.data 
-        : [];
+      const branchesData = Array.isArray(response.data)
+        ? response.data
+        : Array.isArray(response.data?.data)
+          ? response.data.data
+          : [];
       setBranches(branchesData);
-      
+
       // Set default branch if not already set
       if (branchesData.length > 0) {
         setFormData((prev) => {
@@ -105,11 +105,11 @@ export default function NewStudentPage() {
     try {
       const response = await coursesApi.getAll({ isActive: true });
       // Handle different response structures
-      const coursesData = Array.isArray(response.data) 
-        ? response.data 
-        : Array.isArray(response.data?.data) 
-        ? response.data.data 
-        : [];
+      const coursesData = Array.isArray(response.data)
+        ? response.data
+        : Array.isArray(response.data?.data)
+          ? response.data.data
+          : [];
       setCourses(coursesData);
     } catch (error) {
       console.error('Failed to fetch courses:', error);
@@ -122,11 +122,11 @@ export default function NewStudentPage() {
     try {
       const response = await batchesApi.getAll({ isActive: true });
       // Handle different response structures
-      const batchesData = Array.isArray(response.data) 
-        ? response.data 
-        : Array.isArray(response.data?.data) 
-        ? response.data.data 
-        : [];
+      const batchesData = Array.isArray(response.data)
+        ? response.data
+        : Array.isArray(response.data?.data)
+          ? response.data.data
+          : [];
       setBatches(batchesData);
     } catch (error) {
       console.error('Failed to fetch batches:', error);
@@ -265,7 +265,7 @@ export default function NewStudentPage() {
         },
       });
 
-      const studentId = userResponse.data?.id || userResponse.data?.data?.id;
+      const studentId = userResponse.data?.studentId || userResponse.data?.id || userResponse.data?.data?.id;
 
       if (!studentId) {
         throw new Error('Failed to get student ID from response');
@@ -444,14 +444,10 @@ export default function NewStudentPage() {
                       placeholder="optional@example.com"
                     />
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Student Code</label>
-                    <input
-                      type="text"
-                      value={formData.studentCode}
-                      onChange={(e) => setFormData({ ...formData, studentCode: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                    />
+                  <div className="flex items-end pb-2">
+                    <p className="text-xs text-gray-500 italic">
+                      Student Code will be automatically generated.
+                    </p>
                   </div>
                 </div>
 
@@ -508,7 +504,7 @@ export default function NewStudentPage() {
                     <span className="text-sm font-medium text-gray-700">Enroll Student</span>
                   </label>
                 </div>
-                
+
                 {enableEnrollment ? (
                   <div className="space-y-4">
                     {/* Enrollment Type Selection */}
@@ -601,8 +597,8 @@ export default function NewStudentPage() {
                       </div>
                     )}
 
-                    {(enrollmentType === 'course' && formData.courseId) || 
-                     (enrollmentType === 'batch' && formData.batchId) ? (
+                    {(enrollmentType === 'course' && formData.courseId) ||
+                      (enrollmentType === 'batch' && formData.batchId) ? (
                       <div className="grid grid-cols-2 gap-4 mt-4">
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -705,7 +701,7 @@ export default function NewStudentPage() {
                   </>
                 ) : enableEnrollment && enrollmentType ? (
                   <div className="p-4 bg-gray-50 rounded-lg text-center text-sm text-gray-500">
-                    {enrollmentType === 'course' 
+                    {enrollmentType === 'course'
                       ? 'Select course and batch to calculate payment due'
                       : 'Select batch and course to calculate payment due'}
                   </div>

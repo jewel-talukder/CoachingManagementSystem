@@ -107,43 +107,53 @@ public class BranchesController : ControllerBase
             }
         }
 
-        var branch = new Branch
+        using var transaction = await _context.BeginTransactionAsync();
+        try
         {
-            CoachingId = coachingId.Value,
-            Name = request.Name,
-            Code = request.Code,
-            Address = request.Address,
-            City = request.City,
-            State = request.State,
-            ZipCode = request.ZipCode,
-            Country = request.Country,
-            Phone = request.Phone,
-            Email = request.Email,
-            IsActive = true,
-            IsDefault = false
-        };
+            var branch = new Branch
+            {
+                CoachingId = coachingId.Value,
+                Name = request.Name,
+                Code = request.Code,
+                Address = request.Address,
+                City = request.City,
+                State = request.State,
+                ZipCode = request.ZipCode,
+                Country = request.Country,
+                Phone = request.Phone,
+                Email = request.Email,
+                IsActive = true,
+                IsDefault = false
+            };
 
-        _context.Branches.Add(branch);
-        await _context.SaveChangesAsync();
+            _context.Branches.Add(branch);
+            await _context.SaveChangesAsync();
+            await transaction.CommitAsync();
 
-        var branchDto = new BranchDto
+            var branchDto = new BranchDto
+            {
+                Id = branch.Id,
+                CoachingId = branch.CoachingId,
+                Name = branch.Name,
+                Code = branch.Code,
+                Address = branch.Address,
+                City = branch.City,
+                State = branch.State,
+                ZipCode = branch.ZipCode,
+                Country = branch.Country,
+                Phone = branch.Phone,
+                Email = branch.Email,
+                IsActive = branch.IsActive,
+                IsDefault = branch.IsDefault
+            };
+
+            return CreatedAtAction(nameof(GetById), new { id = branch.Id }, branchDto);
+        }
+        catch (Exception)
         {
-            Id = branch.Id,
-            CoachingId = branch.CoachingId,
-            Name = branch.Name,
-            Code = branch.Code,
-            Address = branch.Address,
-            City = branch.City,
-            State = branch.State,
-            ZipCode = branch.ZipCode,
-            Country = branch.Country,
-            Phone = branch.Phone,
-            Email = branch.Email,
-            IsActive = branch.IsActive,
-            IsDefault = branch.IsDefault
-        };
-
-        return CreatedAtAction(nameof(GetById), new { id = branch.Id }, branchDto);
+            await transaction.RollbackAsync();
+            throw;
+        }
     }
 
     [HttpPut("{id}")]
@@ -172,21 +182,31 @@ public class BranchesController : ControllerBase
             }
         }
 
-        branch.Name = request.Name;
-        branch.Code = request.Code;
-        branch.Address = request.Address;
-        branch.City = request.City;
-        branch.State = request.State;
-        branch.ZipCode = request.ZipCode;
-        branch.Country = request.Country;
-        branch.Phone = request.Phone;
-        branch.Email = request.Email;
-        branch.IsActive = request.IsActive;
-        branch.UpdatedAt = DateTime.UtcNow;
+        using var transaction = await _context.BeginTransactionAsync();
+        try
+        {
+            branch.Name = request.Name;
+            branch.Code = request.Code;
+            branch.Address = request.Address;
+            branch.City = request.City;
+            branch.State = request.State;
+            branch.ZipCode = request.ZipCode;
+            branch.Country = request.Country;
+            branch.Phone = request.Phone;
+            branch.Email = request.Email;
+            branch.IsActive = request.IsActive;
+            branch.UpdatedAt = DateTime.UtcNow;
 
-        await _context.SaveChangesAsync();
+            await _context.SaveChangesAsync();
+            await transaction.CommitAsync();
 
-        return Ok(new { message = "Branch updated successfully" });
+            return Ok(new { message = "Branch updated successfully" });
+        }
+        catch (Exception)
+        {
+            await transaction.RollbackAsync();
+            throw;
+        }
     }
 
     [HttpDelete("{id}")]
@@ -219,13 +239,23 @@ public class BranchesController : ControllerBase
             return BadRequest(new { message = "Cannot delete branch with associated data. Please remove all students, teachers, courses, and batches first." });
         }
 
-        // Soft delete
-        branch.IsDeleted = true;
-        branch.UpdatedAt = DateTime.UtcNow;
+        using var transaction = await _context.BeginTransactionAsync();
+        try
+        {
+            // Soft delete
+            branch.IsDeleted = true;
+            branch.UpdatedAt = DateTime.UtcNow;
 
-        await _context.SaveChangesAsync();
+            await _context.SaveChangesAsync();
+            await transaction.CommitAsync();
 
-        return Ok(new { message = "Branch deleted successfully" });
+            return Ok(new { message = "Branch deleted successfully" });
+        }
+        catch (Exception)
+        {
+            await transaction.RollbackAsync();
+            throw;
+        }
     }
 
     private int? GetCoachingId()

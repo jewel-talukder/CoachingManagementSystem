@@ -42,10 +42,10 @@ export default function EditStudentPageClient() {
       setFetching(true);
       const response = await usersApi.getById(studentId);
       const student = response.data;
-      
+
       const branchId = student.additionalData?.BranchId?.toString() || '';
       const dateOfBirth = student.additionalData?.DateOfBirth || '';
-      
+
       setFormData({
         branchId: branchId,
         firstName: student.firstName || '',
@@ -238,9 +238,9 @@ export default function EditStudentPageClient() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Student Code</label>
                 <input
                   type="text"
+                  readOnly
                   value={formData.studentCode}
-                  onChange={(e) => setFormData({ ...formData, studentCode: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 cursor-not-allowed"
                 />
               </div>
             </div>

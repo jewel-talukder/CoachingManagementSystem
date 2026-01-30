@@ -84,7 +84,7 @@ export default function NewEnrollmentPage() {
     if (batchId && courseId && batches.length > 0 && courses.length > 0) {
       const selectedBatch = batches.find(b => b.id === batchId);
       const selectedCourse = courses.find(c => c.id === courseId);
-      
+
       if (selectedBatch && selectedCourse && selectedBatch.monthlyFee && selectedCourse.durationMonths) {
         const calculatedTotalFee = selectedBatch.monthlyFee * selectedCourse.durationMonths;
         setValue('totalFee', calculatedTotalFee);
@@ -130,8 +130,8 @@ export default function NewEnrollmentPage() {
               >
                 <option value="">Select a student</option>
                 {students.map((student) => (
-                  <option key={student.id} value={student.id}>
-                    {student.firstName} {student.lastName} - {student.email}
+                  <option key={student.id} value={student.studentId || student.id}>
+                    {student.firstName} {student.lastName} {student.studentCode ? `(${student.studentCode})` : ''} - {student.phone}
                   </option>
                 ))}
               </select>

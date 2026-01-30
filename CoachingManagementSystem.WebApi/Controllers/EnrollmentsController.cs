@@ -130,9 +130,9 @@ public class EnrollmentsController : ControllerBase
         if (!branchId.HasValue)
             return BadRequest(new { message = "Branch is required" });
 
-        // Verify student exists
+        // Verify student exists - Check both PK and UserId for robustness
         var student = await _context.Students
-            .FirstOrDefaultAsync(s => s.Id == request.StudentId && s.CoachingId == coachingId.Value && !s.IsDeleted);
+            .FirstOrDefaultAsync(s => (s.Id == request.StudentId || s.UserId == request.StudentId) && s.CoachingId == coachingId.Value && !s.IsDeleted);
 
         if (student == null)
             return NotFound(new { message = "Student not found" });
@@ -179,28 +179,38 @@ public class EnrollmentsController : ControllerBase
             calculatedTotalFee = course.Fee.Value;
         }
 
-        var enrollment = new Enrollment
+        using var transaction = await _context.BeginTransactionAsync();
+        try
         {
-            CoachingId = coachingId.Value,
-            BranchId = branchId.Value,
-            StudentId = request.StudentId,
-            CourseId = request.CourseId,
-            BatchId = request.BatchId,
-            EnrollmentDate = DateTime.UtcNow,
-            Status = "Active",
-            FeePaid = request.FeePaid,
-            TotalFee = calculatedTotalFee
-        };
+            var enrollment = new Enrollment
+            {
+                CoachingId = coachingId.Value,
+                BranchId = branchId.Value,
+                StudentId = request.StudentId,
+                CourseId = request.CourseId,
+                BatchId = request.BatchId,
+                EnrollmentDate = DateTime.UtcNow,
+                Status = "Active",
+                FeePaid = request.FeePaid,
+                TotalFee = calculatedTotalFee
+            };
 
-        _context.Enrollments.Add(enrollment);
+            _context.Enrollments.Add(enrollment);
 
-        // Update batch current students count
-        batch.CurrentStudents++;
-        batch.UpdatedAt = DateTime.UtcNow;
+            // Update batch current students count
+            batch.CurrentStudents++;
+            batch.UpdatedAt = DateTime.UtcNow;
 
-        await _context.SaveChangesAsync();
+            await _context.SaveChangesAsync();
+            await transaction.CommitAsync();
 
-        return CreatedAtAction(nameof(GetById), new { id = enrollment.Id }, enrollment);
+            return CreatedAtAction(nameof(GetById), new { id = enrollment.Id }, enrollment);
+        }
+        catch (Exception)
+        {
+            await transaction.RollbackAsync();
+            throw;
+        }
     }
 
     [HttpPut("{id}")]

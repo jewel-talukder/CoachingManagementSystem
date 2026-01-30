@@ -62,7 +62,7 @@ export default function EditUserPageClient() {
       setFetching(true);
       const response = await usersApi.getById(userId);
       const user = response.data;
-      
+
       setFormData({
         firstName: user.firstName || '',
         lastName: user.lastName || '',
@@ -106,7 +106,7 @@ export default function EditUserPageClient() {
 
     try {
       const additionalData: any = {};
-      
+
       if (formData.userType === 'Student') {
         additionalData.StudentCode = formData.studentCode;
         additionalData.DateOfBirth = formData.dateOfBirth;
@@ -320,9 +320,9 @@ export default function EditUserPageClient() {
                   </label>
                   <input
                     type="text"
+                    readOnly
                     value={formData.studentCode}
-                    onChange={(e) => setFormData({ ...formData, studentCode: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 cursor-not-allowed"
                   />
                 </div>
                 <div>
@@ -400,9 +400,9 @@ export default function EditUserPageClient() {
                   </label>
                   <input
                     type="text"
+                    readOnly
                     value={formData.employeeCode}
-                    onChange={(e) => setFormData({ ...formData, employeeCode: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 cursor-not-allowed text-gray-500"
                   />
                 </div>
                 <div>

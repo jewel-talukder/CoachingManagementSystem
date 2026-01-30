@@ -131,48 +131,58 @@ public class PaymentsController : ControllerBase
         // Generate receipt number
         var receiptNumber = $"RCP{DateTime.UtcNow:yyyyMMdd}{new Random().Next(1000, 9999)}";
 
-        var payment = new Payment
+        using var transaction = await _context.BeginTransactionAsync();
+        try
         {
-            CoachingId = coachingId.Value,
-            BranchId = student.BranchId,
-            StudentId = request.StudentId,
-            EnrollmentId = request.EnrollmentId > 0 ? request.EnrollmentId : null,
-            PaymentType = enrollment != null ? "Fee" : "Other",
-            Amount = request.Amount,
-            PaymentDate = DateTime.UtcNow,
-            PaymentMethod = request.PaymentMethod,
-            Status = "Completed",
-            TransactionId = request.TransactionId,
-            ReceiptNumber = receiptNumber,
-            Remarks = request.Remarks
-        };
+            var payment = new Payment
+            {
+                CoachingId = coachingId.Value,
+                BranchId = student.BranchId,
+                StudentId = request.StudentId,
+                EnrollmentId = request.EnrollmentId > 0 ? request.EnrollmentId : null,
+                PaymentType = enrollment != null ? "Fee" : "Other",
+                Amount = request.Amount,
+                PaymentDate = DateTime.UtcNow,
+                PaymentMethod = request.PaymentMethod,
+                Status = "Completed",
+                TransactionId = request.TransactionId,
+                ReceiptNumber = receiptNumber,
+                Remarks = request.Remarks
+            };
 
-        _context.Payments.Add(payment);
+            _context.Payments.Add(payment);
 
-        // Update enrollment fee paid if applicable
-        if (enrollment != null)
-        {
-            enrollment.FeePaid += request.Amount;
-            enrollment.UpdatedAt = DateTime.UtcNow;
+            // Update enrollment fee paid if applicable
+            if (enrollment != null)
+            {
+                enrollment.FeePaid += request.Amount;
+                enrollment.UpdatedAt = DateTime.UtcNow;
+            }
+
+            await _context.SaveChangesAsync();
+            await transaction.CommitAsync();
+
+            return CreatedAtAction(nameof(GetById), new { id = payment.Id }, new PaymentDto
+            {
+                Id = payment.Id,
+                StudentId = payment.StudentId,
+                StudentName = $"{student.User.FirstName} {student.User.LastName}",
+                EnrollmentId = payment.EnrollmentId,
+                PaymentType = payment.PaymentType,
+                Amount = payment.Amount,
+                PaymentDate = payment.PaymentDate,
+                PaymentMethod = payment.PaymentMethod,
+                Status = payment.Status,
+                TransactionId = payment.TransactionId,
+                ReceiptNumber = payment.ReceiptNumber,
+                Remarks = payment.Remarks
+            });
         }
-
-        await _context.SaveChangesAsync();
-
-        return CreatedAtAction(nameof(GetById), new { id = payment.Id }, new PaymentDto
+        catch (Exception)
         {
-            Id = payment.Id,
-            StudentId = payment.StudentId,
-            StudentName = $"{student.User.FirstName} {student.User.LastName}",
-            EnrollmentId = payment.EnrollmentId,
-            PaymentType = payment.PaymentType,
-            Amount = payment.Amount,
-            PaymentDate = payment.PaymentDate,
-            PaymentMethod = payment.PaymentMethod,
-            Status = payment.Status,
-            TransactionId = payment.TransactionId,
-            ReceiptNumber = payment.ReceiptNumber,
-            Remarks = payment.Remarks
-        });
+            await transaction.RollbackAsync();
+            throw;
+        }
     }
 
     [HttpPost("ssl/initiate")]
@@ -262,18 +272,28 @@ public class PaymentsController : ControllerBase
 
         if (payment != null)
         {
-            payment.Status = "Completed";
-            payment.TransactionId = request.TranId;
-            payment.UpdatedAt = DateTime.UtcNow;
-
-            // Update enrollment fee paid
-            if (payment.Enrollment != null)
+            using var transaction = await _context.BeginTransactionAsync();
+            try
             {
-                payment.Enrollment.FeePaid += payment.Amount;
-                payment.Enrollment.UpdatedAt = DateTime.UtcNow;
-            }
+                payment.Status = "Completed";
+                payment.TransactionId = request.TranId;
+                payment.UpdatedAt = DateTime.UtcNow;
 
-            await _context.SaveChangesAsync();
+                // Update enrollment fee paid
+                if (payment.Enrollment != null)
+                {
+                    payment.Enrollment.FeePaid += payment.Amount;
+                    payment.Enrollment.UpdatedAt = DateTime.UtcNow;
+                }
+
+                await _context.SaveChangesAsync();
+                await transaction.CommitAsync();
+            }
+            catch (Exception)
+            {
+                await transaction.RollbackAsync();
+                throw;
+            }
         }
 
         return Redirect($"{Request.Scheme}://{Request.Host}/payment/success?transactionId={request.TranId}");
@@ -336,17 +356,27 @@ public class PaymentsController : ControllerBase
 
             if (payment != null && payment.Status == "Pending")
             {
-                payment.Status = "Completed";
-                payment.TransactionId = request.TranId;
-                payment.UpdatedAt = DateTime.UtcNow;
-
-                if (payment.Enrollment != null)
+                using var transaction = await _context.BeginTransactionAsync();
+                try
                 {
-                    payment.Enrollment.FeePaid += payment.Amount;
-                    payment.Enrollment.UpdatedAt = DateTime.UtcNow;
-                }
+                    payment.Status = "Completed";
+                    payment.TransactionId = request.TranId;
+                    payment.UpdatedAt = DateTime.UtcNow;
 
-                await _context.SaveChangesAsync();
+                    if (payment.Enrollment != null)
+                    {
+                        payment.Enrollment.FeePaid += payment.Amount;
+                        payment.Enrollment.UpdatedAt = DateTime.UtcNow;
+                    }
+
+                    await _context.SaveChangesAsync();
+                    await transaction.CommitAsync();
+                }
+                catch (Exception)
+                {
+                    await transaction.RollbackAsync();
+                    throw;
+                }
             }
         }
 

@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using CoachingManagementSystem.Domain.Entities;
 
 namespace CoachingManagementSystem.Application.Interfaces;
@@ -28,5 +29,6 @@ public interface IApplicationDbContext
     DbSet<Holiday> Holidays { get; }
     
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
+    Task<IDbContextTransaction> BeginTransactionAsync();
 }
 

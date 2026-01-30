@@ -209,12 +209,9 @@ export default function NewTeacherPage() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Employee Code</label>
-                <input
-                  type="text"
-                  value={formData.employeeCode}
-                  onChange={(e) => setFormData({ ...formData, employeeCode: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                />
+                <div className="px-3 py-2 border border-gray-200 rounded-md bg-gray-50 text-gray-500 text-sm">
+                  Will be auto-generated (e.g., emp-01)
+                </div>
               </div>
             </div>
 

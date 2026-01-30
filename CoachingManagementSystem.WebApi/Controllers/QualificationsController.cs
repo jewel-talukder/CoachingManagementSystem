@@ -107,30 +107,40 @@ public class QualificationsController : ControllerBase
         if (existing != null)
             return BadRequest(new { message = "Qualification with this name already exists" });
 
-        var qualification = new Qualification
+        using var transaction = await _context.BeginTransactionAsync();
+        try
         {
-            CoachingId = coachingId.Value,
-            Name = request.Name.Trim(),
-            Description = request.Description?.Trim(),
-            IsActive = true
-        };
+            var qualification = new Qualification
+            {
+                CoachingId = coachingId.Value,
+                Name = request.Name.Trim(),
+                Description = request.Description?.Trim(),
+                IsActive = true
+            };
 
-        _context.Qualifications.Add(qualification);
-        await _context.SaveChangesAsync();
+            _context.Qualifications.Add(qualification);
+            await _context.SaveChangesAsync();
+            await transaction.CommitAsync();
 
-        var teacherCount = await _context.Teachers
-            .CountAsync(t => t.QualificationId == qualification.Id && !t.IsDeleted);
+            var teacherCount = await _context.Teachers
+                .CountAsync(t => t.QualificationId == qualification.Id && !t.IsDeleted);
 
-        var qualificationDto = new QualificationDto
+            var qualificationDto = new QualificationDto
+            {
+                Id = qualification.Id,
+                Name = qualification.Name,
+                Description = qualification.Description,
+                IsActive = qualification.IsActive,
+                TeacherCount = teacherCount
+            };
+
+            return CreatedAtAction(nameof(GetById), new { id = qualification.Id }, qualificationDto);
+        }
+        catch (Exception)
         {
-            Id = qualification.Id,
-            Name = qualification.Name,
-            Description = qualification.Description,
-            IsActive = qualification.IsActive,
-            TeacherCount = teacherCount
-        };
-
-        return CreatedAtAction(nameof(GetById), new { id = qualification.Id }, qualificationDto);
+            await transaction.RollbackAsync();
+            throw;
+        }
     }
 
     [HttpPut("{id}")]
@@ -147,33 +157,43 @@ public class QualificationsController : ControllerBase
         if (qualification == null)
             return NotFound(new { message = "Qualification not found" });
 
-        // Check if new name conflicts with existing qualification
-        if (!string.IsNullOrWhiteSpace(request.Name))
+        using var transaction = await _context.BeginTransactionAsync();
+        try
         {
-            var trimmedName = request.Name.Trim();
-            if (trimmedName.ToLower() != qualification.Name.ToLower())
+            // Check if new name conflicts with existing qualification
+            if (!string.IsNullOrWhiteSpace(request.Name))
             {
-                var existing = await _context.Qualifications
-                    .FirstOrDefaultAsync(q => q.CoachingId == coachingId.Value && 
-                                             q.Id != id &&
-                                             q.Name.ToLower() == trimmedName.ToLower() && 
-                                             !q.IsDeleted);
+                var trimmedName = request.Name.Trim();
+                if (trimmedName.ToLower() != qualification.Name.ToLower())
+                {
+                    var existing = await _context.Qualifications
+                        .FirstOrDefaultAsync(q => q.CoachingId == coachingId.Value && 
+                                                q.Id != id &&
+                                                q.Name.ToLower() == trimmedName.ToLower() && 
+                                                !q.IsDeleted);
 
-                if (existing != null)
-                    return BadRequest(new { message = "Qualification with this name already exists" });
+                    if (existing != null)
+                        return BadRequest(new { message = "Qualification with this name already exists" });
 
-                qualification.Name = trimmedName;
+                    qualification.Name = trimmedName;
+                }
             }
+            if (request.Description != null)
+                qualification.Description = request.Description.Trim();
+            if (request.IsActive.HasValue)
+                qualification.IsActive = request.IsActive.Value;
+
+            qualification.UpdatedAt = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+            await transaction.CommitAsync();
+
+            return Ok(new { message = "Qualification updated successfully" });
         }
-        if (request.Description != null)
-            qualification.Description = request.Description.Trim();
-        if (request.IsActive.HasValue)
-            qualification.IsActive = request.IsActive.Value;
-
-        qualification.UpdatedAt = DateTime.UtcNow;
-        await _context.SaveChangesAsync();
-
-        return Ok(new { message = "Qualification updated successfully" });
+        catch (Exception)
+        {
+            await transaction.RollbackAsync();
+            throw;
+        }
     }
 
     [HttpDelete("{id}")]
@@ -197,12 +217,22 @@ public class QualificationsController : ControllerBase
         if (hasTeachers)
             return BadRequest(new { message = "Cannot delete qualification that is assigned to teachers. Please reassign teachers first." });
 
-        // Soft delete
-        qualification.IsDeleted = true;
-        qualification.UpdatedAt = DateTime.UtcNow;
-        await _context.SaveChangesAsync();
+        using var transaction = await _context.BeginTransactionAsync();
+        try
+        {
+            // Soft delete
+            qualification.IsDeleted = true;
+            qualification.UpdatedAt = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+            await transaction.CommitAsync();
 
-        return Ok(new { message = "Qualification deleted successfully" });
+            return Ok(new { message = "Qualification deleted successfully" });
+        }
+        catch (Exception)
+        {
+            await transaction.RollbackAsync();
+            throw;
+        }
     }
 }
 

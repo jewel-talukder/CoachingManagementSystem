@@ -81,180 +81,182 @@ public class AuthService : IAuthService
             throw new InvalidOperationException("Email already exists");
         }
 
-        // Create coaching
-        var coaching = new Coaching
-        {
-            Name = request.CoachingName,
-            Address = request.Address,
-            City = request.City,
-            State = request.State,
-            ZipCode = request.ZipCode,
-            Country = request.Country,
-            Phone = request.Phone,
-            Email = request.Email,
-            IsActive = true,
-            IsBlocked = false
-        };
-
-        _context.Coachings.Add(coaching);
-        await _context.SaveChangesAsync();
-
-        // Create default branch with coaching name
-        var defaultBranch = new Branch
-        {
-            CoachingId = coaching.Id,
-            Name = request.CoachingName, // Use coaching name as branch name
-            Code = "MAIN", // Default code
-            Address = request.Address,
-            City = request.City,
-            State = request.State,
-            ZipCode = request.ZipCode,
-            Country = request.Country,
-            Phone = request.Phone,
-            Email = request.Email,
-            IsActive = true,
-            IsDefault = true
-        };
-
-        _context.Branches.Add(defaultBranch);
+        using var transaction = await _context.BeginTransactionAsync();
         try
         {
+            // Create coaching
+            var coaching = new Coaching
+            {
+                Name = request.CoachingName,
+                Address = request.Address,
+                City = request.City,
+                State = request.State,
+                ZipCode = request.ZipCode,
+                Country = request.Country,
+                Phone = request.Phone,
+                Email = request.Email,
+                IsActive = true,
+                IsBlocked = false
+            };
+
+            _context.Coachings.Add(coaching);
             await _context.SaveChangesAsync();
-        }
-        catch (Exception ex)
-        {
-            // If branch creation fails, it might be because migration hasn't been run
-            // Log the error and rethrow with more context
-            throw new InvalidOperationException($"Failed to create default branch. Please ensure database migrations have been run. Error: {ex.Message}", ex);
-        }
 
-        // Get Coaching Admin role
-        var adminRole = await _context.Roles.FirstOrDefaultAsync(r => r.Name == "Coaching Admin");
-        if (adminRole == null)
-        {
-            adminRole = new Role { Name = "Coaching Admin", Description = "Coaching Administrator" };
-            _context.Roles.Add(adminRole);
+            // Create default branch with coaching name
+            var defaultBranch = new Branch
+            {
+                CoachingId = coaching.Id,
+                Name = request.CoachingName, // Use coaching name as branch name
+                Code = "MAIN", // Default code
+                Address = request.Address,
+                City = request.City,
+                State = request.State,
+                ZipCode = request.ZipCode,
+                Country = request.Country,
+                Phone = request.Phone,
+                Email = request.Email,
+                IsActive = true,
+                IsDefault = true
+            };
+
+            _context.Branches.Add(defaultBranch);
             await _context.SaveChangesAsync();
-        }
 
-        // Create admin user
-        var adminUser = new User
-        {
-            CoachingId = coaching.Id,
-            FirstName = request.AdminFirstName,
-            LastName = request.AdminLastName,
-            Email = request.AdminEmail,
-            Phone = request.AdminPhone,
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.AdminPassword),
-            IsActive = true
-        };
+            // Get Coaching Admin role
+            var adminRole = await _context.Roles.FirstOrDefaultAsync(u => u.Name == "Coaching Admin");
+            if (adminRole == null)
+            {
+                adminRole = new Role { Name = "Coaching Admin", Description = "Coaching Administrator" };
+                _context.Roles.Add(adminRole);
+                await _context.SaveChangesAsync();
+            }
 
-        _context.Users.Add(adminUser);
-        await _context.SaveChangesAsync();
+            // Create admin user
+            var adminUser = new User
+            {
+                CoachingId = coaching.Id,
+                FirstName = request.AdminFirstName,
+                LastName = request.AdminLastName,
+                Email = request.AdminEmail,
+                Phone = request.AdminPhone,
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.AdminPassword),
+                IsActive = true
+            };
 
-        // Assign role
-        var userRole = new UserRole
-        {
-            UserId = adminUser.Id,
-            RoleId = adminRole.Id
-        };
+            _context.Users.Add(adminUser);
+            await _context.SaveChangesAsync();
 
-        _context.UserRoles.Add(userRole);
-        await _context.SaveChangesAsync();
+            // Assign role
+            var userRole = new UserRole
+            {
+                UserId = adminUser.Id,
+                RoleId = adminRole.Id
+            };
 
-        // Get the first active plan matching the selected billing period
-        var firstPlan = await _context.Plans
-            .Where(p => p.IsActive && !p.IsDeleted && p.BillingPeriod == request.BillingPeriod)
-            .OrderBy(p => p.Id)
-            .FirstOrDefaultAsync();
-        
-        // If no plan found for selected billing period, fallback to Monthly
-        if (firstPlan == null && request.BillingPeriod != "Monthly")
-        {
-            firstPlan = await _context.Plans
-                .Where(p => p.IsActive && !p.IsDeleted && p.BillingPeriod == "Monthly")
+            _context.UserRoles.Add(userRole);
+            await _context.SaveChangesAsync();
+
+            // Get the first active plan matching the selected billing period
+            var firstPlan = await _context.Plans
+                .Where(p => p.IsActive && !p.IsDeleted && p.BillingPeriod == request.BillingPeriod)
                 .OrderBy(p => p.Id)
                 .FirstOrDefaultAsync();
-        }
-
-        PlanDto? planDto = null;
-        if (firstPlan != null)
-        {
-            // Create subscription for the new coaching with the first plan
-            var startDate = DateTime.UtcNow;
-            DateTime endDate;
-            if (firstPlan.TrialDays > 0)
+            
+            // If no plan found for selected billing period, fallback to Monthly
+            if (firstPlan == null && request.BillingPeriod != "Monthly")
             {
-                endDate = startDate.AddDays(firstPlan.TrialDays);
+                firstPlan = await _context.Plans
+                    .Where(p => p.IsActive && !p.IsDeleted && p.BillingPeriod == "Monthly")
+                    .OrderBy(p => p.Id)
+                    .FirstOrDefaultAsync();
             }
-            else
+
+            PlanDto? planDto = null;
+            if (firstPlan != null)
             {
-                // Calculate end date based on billing period
-                endDate = firstPlan.BillingPeriod == "Yearly" 
-                    ? startDate.AddYears(1) 
-                    : startDate.AddMonths(1);
+                // Create subscription for the new coaching with the first plan
+                var startDate = DateTime.UtcNow;
+                DateTime endDate;
+                if (firstPlan.TrialDays > 0)
+                {
+                    endDate = startDate.AddDays(firstPlan.TrialDays);
+                }
+                else
+                {
+                    // Calculate end date based on billing period
+                    endDate = firstPlan.BillingPeriod == "Yearly" 
+                        ? startDate.AddYears(1) 
+                        : startDate.AddMonths(1);
+                }
+                DateTime? trialEndDate = firstPlan.TrialDays > 0 ? endDate : null;
+
+                var subscription = new Subscription
+                {
+                    CoachingId = coaching.Id,
+                    PlanId = firstPlan.Id,
+                    StartDate = startDate,
+                    EndDate = endDate,
+                    TrialEndDate = trialEndDate,
+                    Status = firstPlan.TrialDays > 0 ? "Trial" : "Active",
+                    Amount = firstPlan.Price,
+                    AutoRenew = false
+                };
+
+                _context.Subscriptions.Add(subscription);
+                await _context.SaveChangesAsync();
+
+                // Update coaching with subscription
+                coaching.SubscriptionId = subscription.Id;
+                coaching.PlanId = firstPlan.Id;
+                coaching.SubscriptionExpiresAt = endDate;
+                await _context.SaveChangesAsync();
+
+                // Map plan to DTO
+                planDto = new PlanDto
+                {
+                    Id = firstPlan.Id,
+                    Name = firstPlan.Name,
+                    Description = firstPlan.Description,
+                    Price = firstPlan.Price,
+                    BillingPeriod = firstPlan.BillingPeriod,
+                    TrialDays = firstPlan.TrialDays,
+                    MaxUsers = firstPlan.MaxUsers,
+                    MaxCourses = firstPlan.MaxCourses,
+                    MaxStudents = firstPlan.MaxStudents,
+                    MaxTeachers = firstPlan.MaxTeachers
+                };
             }
-            DateTime? trialEndDate = firstPlan.TrialDays > 0 ? endDate : null;
 
-            var subscription = new Subscription
+            await transaction.CommitAsync();
+
+            // Generate token
+            var roles = new List<string> { adminRole.Name };
+            var token = _jwtService.GenerateToken(adminUser, roles, coaching.Id);
+            var refreshToken = _jwtService.GenerateRefreshToken();
+
+            return new LoginResponse
             {
-                CoachingId = coaching.Id,
-                PlanId = firstPlan.Id,
-                StartDate = startDate,
-                EndDate = endDate,
-                TrialEndDate = trialEndDate,
-                Status = firstPlan.TrialDays > 0 ? "Trial" : "Active",
-                Amount = firstPlan.Price,
-                AutoRenew = false
-            };
-
-            _context.Subscriptions.Add(subscription);
-            await _context.SaveChangesAsync();
-
-            // Update coaching with subscription
-            coaching.SubscriptionId = subscription.Id;
-            coaching.PlanId = firstPlan.Id;
-            coaching.SubscriptionExpiresAt = endDate;
-            await _context.SaveChangesAsync();
-
-            // Map plan to DTO
-            planDto = new PlanDto
-            {
-                Id = firstPlan.Id,
-                Name = firstPlan.Name,
-                Description = firstPlan.Description,
-                Price = firstPlan.Price,
-                BillingPeriod = firstPlan.BillingPeriod,
-                TrialDays = firstPlan.TrialDays,
-                MaxUsers = firstPlan.MaxUsers,
-                MaxCourses = firstPlan.MaxCourses,
-                MaxStudents = firstPlan.MaxStudents,
-                MaxTeachers = firstPlan.MaxTeachers
+                Token = token,
+                RefreshToken = refreshToken,
+                User = new UserDto
+                {
+                    Id = adminUser.Id,
+                    CoachingId = coaching.Id,
+                    FirstName = adminUser.FirstName,
+                    LastName = adminUser.LastName,
+                    Email = adminUser.Email,
+                    Phone = adminUser.Phone,
+                    Roles = roles
+                },
+                ExpiresAt = DateTime.UtcNow.AddHours(24),
+                Plan = planDto
             };
         }
-
-        // Generate token
-        var roles = new List<string> { adminRole.Name };
-        var token = _jwtService.GenerateToken(adminUser, roles, coaching.Id);
-        var refreshToken = _jwtService.GenerateRefreshToken();
-
-        return new LoginResponse
+        catch (Exception)
         {
-            Token = token,
-            RefreshToken = refreshToken,
-            User = new UserDto
-            {
-                Id = adminUser.Id,
-                CoachingId = coaching.Id,
-                FirstName = adminUser.FirstName,
-                LastName = adminUser.LastName,
-                Email = adminUser.Email,
-                Phone = adminUser.Phone,
-                Roles = roles
-            },
-            ExpiresAt = DateTime.UtcNow.AddHours(24),
-            Plan = planDto
-        };
+            await transaction.RollbackAsync();
+            throw;
+        }
     }
 
     public async Task<bool> ValidateTokenAsync(string token)

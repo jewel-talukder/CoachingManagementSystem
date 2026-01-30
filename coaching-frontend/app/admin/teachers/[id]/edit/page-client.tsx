@@ -235,9 +235,9 @@ export default function EditTeacherPageClient() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Employee Code</label>
                 <input
                   type="text"
+                  readOnly
                   value={formData.employeeCode}
-                  onChange={(e) => setFormData({ ...formData, employeeCode: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 cursor-not-allowed text-gray-500"
                 />
               </div>
             </div>

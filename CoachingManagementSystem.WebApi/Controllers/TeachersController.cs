@@ -156,28 +156,32 @@ public class TeachersController : ControllerBase
         if (teacherRole == null)
             return BadRequest(new { message = "Teacher role not found" });
 
-        // Create user
-        var user = new User
+        using var transaction = await _context.BeginTransactionAsync();
+        try
         {
-            CoachingId = coachingId.Value,
-            FirstName = request.FirstName,
-            LastName = request.LastName,
-            Email = request.Email,
-            Phone = request.Phone,
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password),
-            IsActive = true
-        };
+            // Create user
+            var user = new User
+            {
+                CoachingId = coachingId.Value,
+                FirstName = request.FirstName,
+                LastName = request.LastName,
+                Email = request.Email,
+                Phone = request.Phone,
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password),
+                IsActive = true
+            };
 
-        _context.Users.Add(user);
-        await _context.SaveChangesAsync();
+            _context.Users.Add(user);
+            await _context.SaveChangesAsync();
 
-        // Assign Teacher role
-        var userRole = new UserRole
-        {
-            UserId = user.Id,
-            RoleId = teacherRole.Id
-        };
-        _context.UserRoles.Add(userRole);
+            // Assign Teacher role
+            var userRole = new UserRole
+            {
+                UserId = user.Id,
+                RoleId = teacherRole.Id
+            };
+            _context.UserRoles.Add(userRole);
+            await _context.SaveChangesAsync();
 
         // Validate qualification if provided
         int? qualificationId = null;
@@ -219,10 +223,18 @@ public class TeachersController : ControllerBase
             Salary = request.Salary
         };
 
-        _context.Teachers.Add(teacher);
-        await _context.SaveChangesAsync();
+            _context.Teachers.Add(teacher);
+            await _context.SaveChangesAsync();
 
-        return CreatedAtAction(nameof(GetById), new { id = teacher.Id }, teacher);
+            await transaction.CommitAsync();
+
+            return CreatedAtAction(nameof(GetById), new { id = teacher.Id }, teacher);
+        }
+        catch (Exception)
+        {
+            await transaction.RollbackAsync();
+            throw;
+        }
     }
 
     [HttpPut("{id}")]
@@ -240,83 +252,93 @@ public class TeachersController : ControllerBase
         if (teacher == null)
             return NotFound(new { message = "Teacher not found" });
 
-        // Update user fields
-        if (!string.IsNullOrEmpty(request.FirstName))
-            teacher.User.FirstName = request.FirstName;
-        if (!string.IsNullOrEmpty(request.LastName))
-            teacher.User.LastName = request.LastName;
-        if (!string.IsNullOrEmpty(request.Email))
+        using var transaction = await _context.BeginTransactionAsync();
+        try
         {
-            // Check if email already exists for another user
-            var existingUser = await _context.Users
-                .FirstOrDefaultAsync(u => u.Email == request.Email && u.Id != teacher.UserId && u.CoachingId == coachingId.Value && !u.IsDeleted);
-            if (existingUser != null)
-                return BadRequest(new { message = "Email already exists" });
-            teacher.User.Email = request.Email;
-        }
-        if (request.Phone != null)
-            teacher.User.Phone = request.Phone;
-        if (request.IsActive.HasValue)
-            teacher.User.IsActive = request.IsActive.Value;
+            // Update user fields
+            if (!string.IsNullOrEmpty(request.FirstName))
+                teacher.User.FirstName = request.FirstName;
+            if (!string.IsNullOrEmpty(request.LastName))
+                teacher.User.LastName = request.LastName;
+            if (!string.IsNullOrEmpty(request.Email))
+            {
+                // Check if email already exists for another user
+                var existingUser = await _context.Users
+                    .FirstOrDefaultAsync(u => u.Email == request.Email && u.Id != teacher.UserId && u.CoachingId == coachingId.Value && !u.IsDeleted);
+                if (existingUser != null)
+                    return BadRequest(new { message = "Email already exists" });
+                teacher.User.Email = request.Email;
+            }
+            if (request.Phone != null)
+                teacher.User.Phone = request.Phone;
+            if (request.IsActive.HasValue)
+                teacher.User.IsActive = request.IsActive.Value;
 
-        // Update teacher fields
-        if (request.BranchId.HasValue && request.BranchId.Value != 0)
+            // Update teacher fields
+            if (request.BranchId.HasValue && request.BranchId.Value != 0)
+            {
+                var branch = await _context.Branches
+                    .FirstOrDefaultAsync(b => b.Id == request.BranchId.Value && b.CoachingId == coachingId.Value && !b.IsDeleted);
+                if (branch == null)
+                    return BadRequest(new { message = "Branch not found" });
+                teacher.BranchId = request.BranchId.Value;
+            }
+            if (request.EmployeeCode != null)
+                teacher.EmployeeCode = request.EmployeeCode;
+            if (request.QualificationId.HasValue)
+            {
+                if (request.QualificationId.Value == 0)
+                {
+                    teacher.QualificationId = null;
+                }
+                else
+                {
+                    var qualification = await _context.Qualifications
+                        .FirstOrDefaultAsync(q => q.Id == request.QualificationId.Value && 
+                                                q.CoachingId == coachingId.Value && 
+                                                !q.IsDeleted);
+                    if (qualification == null)
+                        return BadRequest(new { message = "Qualification not found" });
+                    teacher.QualificationId = qualification.Id;
+                }
+            }
+            if (request.SpecializationId.HasValue)
+            {
+                if (request.SpecializationId.Value == 0)
+                {
+                    teacher.SpecializationId = null;
+                }
+                else
+                {
+                    var specialization = await _context.Specializations
+                        .FirstOrDefaultAsync(s => s.Id == request.SpecializationId.Value && 
+                                                s.CoachingId == coachingId.Value && 
+                                                !s.IsDeleted);
+                    if (specialization == null)
+                        return BadRequest(new { message = "Specialization not found" });
+                    teacher.SpecializationId = specialization.Id;
+                }
+            }
+            if (request.JoiningDate.HasValue)
+                teacher.JoiningDate = request.JoiningDate;
+            if (request.EmploymentType.HasValue)
+                teacher.EmploymentType = request.EmploymentType.Value;
+            if (request.Salary.HasValue)
+                teacher.Salary = request.Salary;
+
+            teacher.UpdatedAt = DateTime.UtcNow;
+            teacher.User.UpdatedAt = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync();
+            await transaction.CommitAsync();
+
+            return Ok(new { message = "Teacher updated successfully" });
+        }
+        catch (Exception)
         {
-            var branch = await _context.Branches
-                .FirstOrDefaultAsync(b => b.Id == request.BranchId.Value && b.CoachingId == coachingId.Value && !b.IsDeleted);
-            if (branch == null)
-                return BadRequest(new { message = "Branch not found" });
-            teacher.BranchId = request.BranchId.Value;
+            await transaction.RollbackAsync();
+            throw;
         }
-        if (request.EmployeeCode != null)
-            teacher.EmployeeCode = request.EmployeeCode;
-        if (request.QualificationId.HasValue)
-        {
-            if (request.QualificationId.Value == 0)
-            {
-                teacher.QualificationId = null;
-            }
-            else
-            {
-                var qualification = await _context.Qualifications
-                    .FirstOrDefaultAsync(q => q.Id == request.QualificationId.Value && 
-                                             q.CoachingId == coachingId.Value && 
-                                             !q.IsDeleted);
-                if (qualification == null)
-                    return BadRequest(new { message = "Qualification not found" });
-                teacher.QualificationId = qualification.Id;
-            }
-        }
-        if (request.SpecializationId.HasValue)
-        {
-            if (request.SpecializationId.Value == 0)
-            {
-                teacher.SpecializationId = null;
-            }
-            else
-            {
-                var specialization = await _context.Specializations
-                    .FirstOrDefaultAsync(s => s.Id == request.SpecializationId.Value && 
-                                             s.CoachingId == coachingId.Value && 
-                                             !s.IsDeleted);
-                if (specialization == null)
-                    return BadRequest(new { message = "Specialization not found" });
-                teacher.SpecializationId = specialization.Id;
-            }
-        }
-        if (request.JoiningDate.HasValue)
-            teacher.JoiningDate = request.JoiningDate;
-        if (request.EmploymentType.HasValue)
-            teacher.EmploymentType = request.EmploymentType.Value;
-        if (request.Salary.HasValue)
-            teacher.Salary = request.Salary;
-
-        teacher.UpdatedAt = DateTime.UtcNow;
-        teacher.User.UpdatedAt = DateTime.UtcNow;
-
-        await _context.SaveChangesAsync();
-
-        return Ok(new { message = "Teacher updated successfully" });
     }
 
     [HttpDelete("{id}")]
@@ -343,15 +365,25 @@ public class TeachersController : ControllerBase
         if (hasBatches || hasCourses)
             return BadRequest(new { message = "Cannot delete teacher assigned to batches or courses. Please reassign them first." });
 
-        // Soft delete
-        teacher.IsDeleted = true;
-        teacher.UpdatedAt = DateTime.UtcNow;
-        teacher.User.IsDeleted = true;
-        teacher.User.UpdatedAt = DateTime.UtcNow;
+        using var transaction = await _context.BeginTransactionAsync();
+        try
+        {
+            // Soft delete
+            teacher.IsDeleted = true;
+            teacher.UpdatedAt = DateTime.UtcNow;
+            teacher.User.IsDeleted = true;
+            teacher.User.UpdatedAt = DateTime.UtcNow;
 
-        await _context.SaveChangesAsync();
+            await _context.SaveChangesAsync();
+            await transaction.CommitAsync();
 
-        return Ok(new { message = "Teacher deleted successfully" });
+            return Ok(new { message = "Teacher deleted successfully" });
+        }
+        catch (Exception)
+        {
+            await transaction.RollbackAsync();
+            throw;
+        }
     }
 }
 

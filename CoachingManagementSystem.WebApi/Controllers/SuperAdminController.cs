@@ -145,47 +145,59 @@ public class SuperAdminController : ControllerBase
         if (plan == null)
             return NotFound(new { message = "Plan not found" });
 
-        // Create or update subscription
-        var subscription = await _context.Subscriptions
-            .FirstOrDefaultAsync(s => s.CoachingId == id && s.Status == "Active");
-
-        var startDate = DateTime.UtcNow;
-        var endDate = plan.BillingPeriod == "Monthly" 
-            ? startDate.AddMonths(1) 
-            : startDate.AddYears(1);
-
-        if (subscription == null)
+        using var transaction = await _context.BeginTransactionAsync();
+        try
         {
-            subscription = new Subscription
+            // Create or update subscription
+            var subscription = await _context.Subscriptions
+                .FirstOrDefaultAsync(s => s.CoachingId == id && s.Status == "Active");
+
+            var startDate = DateTime.UtcNow;
+            var endDate = plan.BillingPeriod == "Monthly" 
+                ? startDate.AddMonths(1) 
+                : startDate.AddYears(1);
+
+            if (subscription == null)
             {
-                CoachingId = id,
-                PlanId = plan.Id,
-                StartDate = startDate,
-                EndDate = endDate,
-                Status = "Active",
-                Amount = plan.Price,
-                AutoRenew = request.AutoRenew
-            };
-            _context.Subscriptions.Add(subscription);
+                subscription = new Subscription
+                {
+                    CoachingId = id,
+                    PlanId = plan.Id,
+                    StartDate = startDate,
+                    EndDate = endDate,
+                    Status = "Active",
+                    Amount = plan.Price,
+                    AutoRenew = request.AutoRenew
+                };
+                _context.Subscriptions.Add(subscription);
+            }
+            else
+            {
+                subscription.PlanId = plan.Id;
+                subscription.StartDate = startDate;
+                subscription.EndDate = endDate;
+                subscription.Amount = plan.Price;
+                subscription.AutoRenew = request.AutoRenew;
+                subscription.UpdatedAt = DateTime.UtcNow;
+            }
+
+            await _context.SaveChangesAsync();
+
+            coaching.PlanId = plan.Id;
+            coaching.SubscriptionId = subscription.Id;
+            coaching.SubscriptionExpiresAt = endDate;
+            coaching.UpdatedAt = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync();
+            await transaction.CommitAsync();
+
+            return Ok(new { message = "Plan assigned successfully" });
         }
-        else
+        catch (Exception)
         {
-            subscription.PlanId = plan.Id;
-            subscription.StartDate = startDate;
-            subscription.EndDate = endDate;
-            subscription.Amount = plan.Price;
-            subscription.AutoRenew = request.AutoRenew;
-            subscription.UpdatedAt = DateTime.UtcNow;
+            await transaction.RollbackAsync();
+            throw;
         }
-
-        coaching.PlanId = plan.Id;
-        coaching.SubscriptionId = subscription.Id;
-        coaching.SubscriptionExpiresAt = endDate;
-        coaching.UpdatedAt = DateTime.UtcNow;
-
-        await _context.SaveChangesAsync();
-
-        return Ok(new { message = "Plan assigned successfully" });
     }
 }
 

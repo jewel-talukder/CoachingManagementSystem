@@ -68,7 +68,7 @@ export default function StudentsPage() {
 
   // Calculate payment due for a student
   const calculatePaymentDue = (student: any) => {
-    const studentEnrollments = getStudentEnrollments(student.id);
+    const studentEnrollments = student.studentId ? getStudentEnrollments(student.studentId) : [];
     if (studentEnrollments.length === 0) {
       return { due: 0, status: 'no-enrollment', text: 'No Enrollment' };
     }
@@ -159,19 +159,19 @@ export default function StudentsPage() {
                   Student Name
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Email
+                  Student Code
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Phone
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Payment Status
+                  Parent Name
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Payment Due
+                  Parent Phone
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Status
+                  Enrollment Status
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Actions
@@ -192,55 +192,37 @@ export default function StudentsPage() {
                       {student.firstName} {student.lastName}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {student.email}
+                      {student.studentCode || <span className="text-gray-400">N/A</span>}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">
                       {student.phone || <span className="text-gray-400">-</span>}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm">
-                      {(() => {
-                        const payment = calculatePaymentDue(student);
-                        return (
-                          <span
-                            className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                              payment.status === 'paid'
-                                ? 'bg-green-100 text-green-800'
-                                : payment.status === 'no-enrollment'
-                                ? 'bg-gray-100 text-gray-800'
-                                : 'bg-yellow-100 text-yellow-800'
-                            }`}
-                          >
-                            {payment.text}
-                          </span>
-                        );
-                      })()}
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {student.parentName || <span className="text-gray-400">-</span>}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {student.parentPhone || <span className="text-gray-400">-</span>}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">
                       {(() => {
-                        const payment = calculatePaymentDue(student);
-                        if (payment.status === 'no-enrollment') {
-                          return <span className="text-gray-400">-</span>;
+                        const enrolls = student.studentId ? getStudentEnrollments(student.studentId) : [];
+                        if (enrolls.length === 0) {
+                          return (
+                            <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
+                              Not Enrolled
+                            </span>
+                          );
                         }
                         return (
-                          <div className="flex items-center">
-                            <DollarSign className={`h-4 w-4 mr-1 ${payment.due > 0 ? 'text-red-500' : 'text-green-500'}`} />
-                            <span className={payment.due > 0 ? 'text-red-600 font-semibold' : 'text-green-600'}>
-                              ${payment.due.toFixed(2)}
-                            </span>
+                          <div className="flex flex-col space-y-1">
+                            {enrolls.map((e: any) => (
+                              <span key={e.id} className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                                Enrolled: {e.courseName}
+                              </span>
+                            ))}
                           </div>
                         );
                       })()}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span
-                        className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                          student.isActive
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-red-100 text-red-800'
-                        }`}
-                      >
-                        {student.isActive ? 'Active' : 'Inactive'}
-                      </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <div className="flex items-center space-x-3">

@@ -74,45 +74,55 @@ public class AttendanceController : ControllerBase
 
         var attendances = new List<Attendance>();
 
-        foreach (var item in request.AttendanceItems)
+        using var transaction = await _context.BeginTransactionAsync();
+        try
         {
-            // Check if attendance already exists for this date
-            var existing = await _context.Attendances
-                .FirstOrDefaultAsync(a => a.StudentId == item.StudentId 
-                    && a.BatchId == request.BatchId 
-                    && a.AttendanceDate.Date == request.Date.Date 
-                    && !a.IsDeleted);
+            foreach (var item in request.AttendanceItems)
+            {
+                // Check if attendance already exists for this date
+                var existing = await _context.Attendances
+                    .FirstOrDefaultAsync(a => a.StudentId == item.StudentId 
+                        && a.BatchId == request.BatchId 
+                        && a.AttendanceDate.Date == request.Date.Date 
+                        && !a.IsDeleted);
 
-            if (existing != null)
-            {
-                existing.Status = item.Status;
-                existing.Remarks = item.Remarks;
-                existing.UpdatedAt = DateTime.UtcNow;
-            }
-            else
-            {
-                var attendance = new Attendance
+                if (existing != null)
                 {
-                    CoachingId = coachingId.Value,
-                    StudentId = item.StudentId,
-                    BatchId = request.BatchId,
-                    AttendanceDate = request.Date,
-                    Status = item.Status,
-                    Remarks = item.Remarks,
-                    MarkedByUserId = userId
-                };
-                attendances.Add(attendance);
+                    existing.Status = item.Status;
+                    existing.Remarks = item.Remarks;
+                    existing.UpdatedAt = DateTime.UtcNow;
+                }
+                else
+                {
+                    var attendance = new Attendance
+                    {
+                        CoachingId = coachingId.Value,
+                        StudentId = item.StudentId,
+                        BatchId = request.BatchId,
+                        AttendanceDate = request.Date,
+                        Status = item.Status,
+                        Remarks = item.Remarks,
+                        MarkedByUserId = userId
+                    };
+                    attendances.Add(attendance);
+                }
             }
-        }
 
-        if (attendances.Any())
+            if (attendances.Any())
+            {
+                _context.Attendances.AddRange(attendances);
+            }
+
+            await _context.SaveChangesAsync();
+            await transaction.CommitAsync();
+
+            return Ok(new { message = "Attendance marked successfully" });
+        }
+        catch (Exception)
         {
-            _context.Attendances.AddRange(attendances);
+            await transaction.RollbackAsync();
+            throw;
         }
-
-        await _context.SaveChangesAsync();
-
-        return Ok(new { message = "Attendance marked successfully" });
     }
 
     [HttpGet("student/{studentId}")]

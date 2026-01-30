@@ -163,50 +163,60 @@ public class ExamsController : ControllerBase
 
         var results = new List<Result>();
 
-        foreach (var item in request.Results)
+        using var transaction = await _context.BeginTransactionAsync();
+        try
         {
-            // Check if result already exists
-            var existing = await _context.Results
-                .FirstOrDefaultAsync(r => r.StudentId == item.StudentId && r.ExamId == id && !r.IsDeleted);
-
-            var grade = CalculateGrade(item.MarksObtained, exam.TotalMarks, exam.PassingMarks);
-
-            if (existing != null)
+            foreach (var item in request.Results)
             {
-                existing.MarksObtained = item.MarksObtained;
-                existing.TotalMarks = exam.TotalMarks;
-                existing.Grade = grade;
-                existing.Remarks = item.Remarks;
-                existing.PublishedAt = DateTime.UtcNow;
-                existing.PublishedByUserId = userId;
-                existing.UpdatedAt = DateTime.UtcNow;
-            }
-            else
-            {
-                var result = new Result
+                // Check if result already exists
+                var existing = await _context.Results
+                    .FirstOrDefaultAsync(r => r.StudentId == item.StudentId && r.ExamId == id && !r.IsDeleted);
+
+                var grade = CalculateGrade(item.MarksObtained, exam.TotalMarks, exam.PassingMarks);
+
+                if (existing != null)
                 {
-                    CoachingId = coachingId.Value,
-                    StudentId = item.StudentId,
-                    ExamId = id,
-                    MarksObtained = item.MarksObtained,
-                    TotalMarks = exam.TotalMarks,
-                    Grade = grade,
-                    Remarks = item.Remarks,
-                    PublishedAt = DateTime.UtcNow,
-                    PublishedByUserId = userId
-                };
-                results.Add(result);
+                    existing.MarksObtained = item.MarksObtained;
+                    existing.TotalMarks = exam.TotalMarks;
+                    existing.Grade = grade;
+                    existing.Remarks = item.Remarks;
+                    existing.PublishedAt = DateTime.UtcNow;
+                    existing.PublishedByUserId = userId;
+                    existing.UpdatedAt = DateTime.UtcNow;
+                }
+                else
+                {
+                    var result = new Result
+                    {
+                        CoachingId = coachingId.Value,
+                        StudentId = item.StudentId,
+                        ExamId = id,
+                        MarksObtained = item.MarksObtained,
+                        TotalMarks = exam.TotalMarks,
+                        Grade = grade,
+                        Remarks = item.Remarks,
+                        PublishedAt = DateTime.UtcNow,
+                        PublishedByUserId = userId
+                    };
+                    results.Add(result);
+                }
             }
-        }
 
-        if (results.Any())
+            if (results.Any())
+            {
+                _context.Results.AddRange(results);
+            }
+
+            await _context.SaveChangesAsync();
+            await transaction.CommitAsync();
+
+            return Ok(new { message = "Results uploaded successfully" });
+        }
+        catch (Exception)
         {
-            _context.Results.AddRange(results);
+            await transaction.RollbackAsync();
+            throw;
         }
-
-        await _context.SaveChangesAsync();
-
-        return Ok(new { message = "Results uploaded successfully" });
     }
 
     [HttpGet("student/{studentId}")]

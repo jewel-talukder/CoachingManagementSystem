@@ -133,81 +133,91 @@ public class SubscriptionsController : ControllerBase
         if (coaching.PlanId == newPlan.Id)
             return BadRequest(new { message = "You are already on this plan" });
 
-        var startDate = DateTime.UtcNow;
-        DateTime endDate;
-        
-        // If current subscription is in trial, end trial immediately
-        if (coaching.Subscription != null && coaching.Subscription.Status == "Trial")
+        using var transaction = await _context.BeginTransactionAsync();
+        try
         {
-            // End trial and start new plan immediately
-            endDate = newPlan.BillingPeriod == "Yearly" 
-                ? startDate.AddYears(1) 
-                : startDate.AddMonths(1);
-        }
-        else
-        {
-            // If subscription exists and not expired, extend from current end date
-            if (coaching.Subscription != null && coaching.Subscription.EndDate > startDate)
+            var startDate = DateTime.UtcNow;
+            DateTime endDate;
+            
+            // If current subscription is in trial, end trial immediately
+            if (coaching.Subscription != null && coaching.Subscription.Status == "Trial")
             {
-                var remainingDays = (coaching.Subscription.EndDate - startDate).Days;
-                if (newPlan.BillingPeriod == "Yearly")
-                {
-                    endDate = startDate.AddYears(1).AddDays(remainingDays);
-                }
-                else
-                {
-                    endDate = startDate.AddMonths(1).AddDays(remainingDays);
-                }
-            }
-            else
-            {
-                // New subscription
+                // End trial and start new plan immediately
                 endDate = newPlan.BillingPeriod == "Yearly" 
                     ? startDate.AddYears(1) 
                     : startDate.AddMonths(1);
             }
-        }
-
-        // Update or create subscription
-        if (coaching.Subscription != null)
-        {
-            // Update existing subscription
-            coaching.Subscription.PlanId = newPlan.Id;
-            coaching.Subscription.StartDate = startDate;
-            coaching.Subscription.EndDate = endDate;
-            coaching.Subscription.TrialEndDate = null; // End trial if exists
-            coaching.Subscription.Status = "Active";
-            coaching.Subscription.Amount = newPlan.Price;
-            coaching.Subscription.AutoRenew = request.AutoRenew;
-            coaching.Subscription.UpdatedAt = DateTime.UtcNow;
-        }
-        else
-        {
-            // Create new subscription
-            var subscription = new Subscription
+            else
             {
-                CoachingId = coachingId.Value,
-                PlanId = newPlan.Id,
-                StartDate = startDate,
-                EndDate = endDate,
-                TrialEndDate = null,
-                Status = "Active",
-                Amount = newPlan.Price,
-                AutoRenew = request.AutoRenew
-            };
-            _context.Subscriptions.Add(subscription);
+                // If subscription exists and not expired, extend from current end date
+                if (coaching.Subscription != null && coaching.Subscription.EndDate > startDate)
+                {
+                    var remainingDays = (coaching.Subscription.EndDate - startDate).Days;
+                    if (newPlan.BillingPeriod == "Yearly")
+                    {
+                        endDate = startDate.AddYears(1).AddDays(remainingDays);
+                    }
+                    else
+                    {
+                        endDate = startDate.AddMonths(1).AddDays(remainingDays);
+                    }
+                }
+                else
+                {
+                    // New subscription
+                    endDate = newPlan.BillingPeriod == "Yearly" 
+                        ? startDate.AddYears(1) 
+                        : startDate.AddMonths(1);
+                }
+            }
+
+            // Update or create subscription
+            if (coaching.Subscription != null)
+            {
+                // Update existing subscription
+                coaching.Subscription.PlanId = newPlan.Id;
+                coaching.Subscription.StartDate = startDate;
+                coaching.Subscription.EndDate = endDate;
+                coaching.Subscription.TrialEndDate = null; // End trial if exists
+                coaching.Subscription.Status = "Active";
+                coaching.Subscription.Amount = newPlan.Price;
+                coaching.Subscription.AutoRenew = request.AutoRenew;
+                coaching.Subscription.UpdatedAt = DateTime.UtcNow;
+            }
+            else
+            {
+                // Create new subscription
+                var subscription = new Subscription
+                {
+                    CoachingId = coachingId.Value,
+                    PlanId = newPlan.Id,
+                    StartDate = startDate,
+                    EndDate = endDate,
+                    TrialEndDate = null,
+                    Status = "Active",
+                    Amount = newPlan.Price,
+                    AutoRenew = request.AutoRenew
+                };
+                _context.Subscriptions.Add(subscription);
+                await _context.SaveChangesAsync();
+                coaching.SubscriptionId = subscription.Id;
+            }
+
+            // Update coaching
+            coaching.PlanId = newPlan.Id;
+            coaching.SubscriptionExpiresAt = endDate;
+            coaching.UpdatedAt = DateTime.UtcNow;
+
             await _context.SaveChangesAsync();
-            coaching.SubscriptionId = subscription.Id;
+            await transaction.CommitAsync();
+
+            return Ok(new { message = "Plan changed successfully", newPlan = newPlan.Name });
         }
-
-        // Update coaching
-        coaching.PlanId = newPlan.Id;
-        coaching.SubscriptionExpiresAt = endDate;
-        coaching.UpdatedAt = DateTime.UtcNow;
-
-        await _context.SaveChangesAsync();
-
-        return Ok(new { message = "Plan changed successfully", newPlan = newPlan.Name });
+        catch (Exception)
+        {
+            await transaction.RollbackAsync();
+            throw;
+        }
     }
 }
 

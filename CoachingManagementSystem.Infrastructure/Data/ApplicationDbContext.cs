@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using CoachingManagementSystem.Domain.Entities;
 using CoachingManagementSystem.Application.Interfaces;
 
@@ -37,9 +38,15 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
         base.OnModelCreating(modelBuilder);
 
         // Configure indexes for multi-tenancy
-        modelBuilder.Entity<User>().HasIndex(u => new { u.CoachingId, u.Email }).IsUnique();
+        modelBuilder.Entity<User>()
+            .HasIndex(u => new { u.CoachingId, u.Email })
+            .IsUnique()
+            .HasFilter("[Email] IS NOT NULL AND [Email] <> ''");
         modelBuilder.Entity<Branch>().HasIndex(b => new { b.CoachingId, b.Code }).IsUnique();
-        modelBuilder.Entity<Student>().HasIndex(s => new { s.BranchId, s.StudentCode }).IsUnique();
+        modelBuilder.Entity<Student>()
+            .HasIndex(s => new { s.BranchId, s.StudentCode })
+            .IsUnique()
+            .HasFilter("[StudentCode] IS NOT NULL AND [StudentCode] <> ''");
         modelBuilder.Entity<Teacher>().HasIndex(t => new { t.BranchId, t.EmployeeCode }).IsUnique();
         modelBuilder.Entity<Course>().HasIndex(c => new { c.BranchId, c.Code }).IsUnique();
         modelBuilder.Entity<Batch>().HasIndex(b => new { b.BranchId, b.Code }).IsUnique();
@@ -284,6 +291,11 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
         modelBuilder.Entity<Qualification>().HasQueryFilter(q => !q.IsDeleted);
         modelBuilder.Entity<Specialization>().HasQueryFilter(s => !s.IsDeleted);
         modelBuilder.Entity<Holiday>().HasQueryFilter(h => !h.IsDeleted);
+    }
+
+    public Task<IDbContextTransaction> BeginTransactionAsync()
+    {
+        return Database.BeginTransactionAsync();
     }
 }
 

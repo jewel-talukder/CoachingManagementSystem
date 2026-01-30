@@ -107,30 +107,40 @@ public class SpecializationsController : ControllerBase
         if (existing != null)
             return BadRequest(new { message = "Specialization with this name already exists" });
 
-        var specialization = new Specialization
+        using var transaction = await _context.BeginTransactionAsync();
+        try
         {
-            CoachingId = coachingId.Value,
-            Name = request.Name.Trim(),
-            Description = request.Description?.Trim(),
-            IsActive = true
-        };
+            var specialization = new Specialization
+            {
+                CoachingId = coachingId.Value,
+                Name = request.Name.Trim(),
+                Description = request.Description?.Trim(),
+                IsActive = true
+            };
 
-        _context.Specializations.Add(specialization);
-        await _context.SaveChangesAsync();
+            _context.Specializations.Add(specialization);
+            await _context.SaveChangesAsync();
+            await transaction.CommitAsync();
 
-        var teacherCount = await _context.Teachers
-            .CountAsync(t => t.SpecializationId == specialization.Id && !t.IsDeleted);
+            var teacherCount = await _context.Teachers
+                .CountAsync(t => t.SpecializationId == specialization.Id && !t.IsDeleted);
 
-        var specializationDto = new SpecializationDto
+            var specializationDto = new SpecializationDto
+            {
+                Id = specialization.Id,
+                Name = specialization.Name,
+                Description = specialization.Description,
+                IsActive = specialization.IsActive,
+                TeacherCount = teacherCount
+            };
+
+            return CreatedAtAction(nameof(GetById), new { id = specialization.Id }, specializationDto);
+        }
+        catch (Exception)
         {
-            Id = specialization.Id,
-            Name = specialization.Name,
-            Description = specialization.Description,
-            IsActive = specialization.IsActive,
-            TeacherCount = teacherCount
-        };
-
-        return CreatedAtAction(nameof(GetById), new { id = specialization.Id }, specializationDto);
+            await transaction.RollbackAsync();
+            throw;
+        }
     }
 
     [HttpPut("{id}")]
@@ -147,33 +157,43 @@ public class SpecializationsController : ControllerBase
         if (specialization == null)
             return NotFound(new { message = "Specialization not found" });
 
-        // Check if new name conflicts with existing specialization
-        if (!string.IsNullOrWhiteSpace(request.Name))
+        using var transaction = await _context.BeginTransactionAsync();
+        try
         {
-            var trimmedName = request.Name.Trim();
-            if (trimmedName.ToLower() != specialization.Name.ToLower())
+            // Check if new name conflicts with existing specialization
+            if (!string.IsNullOrWhiteSpace(request.Name))
             {
-                var existing = await _context.Specializations
-                    .FirstOrDefaultAsync(s => s.CoachingId == coachingId.Value && 
-                                             s.Id != id &&
-                                             s.Name.ToLower() == trimmedName.ToLower() && 
-                                             !s.IsDeleted);
+                var trimmedName = request.Name.Trim();
+                if (trimmedName.ToLower() != specialization.Name.ToLower())
+                {
+                    var existing = await _context.Specializations
+                        .FirstOrDefaultAsync(s => s.CoachingId == coachingId.Value && 
+                                                s.Id != id &&
+                                                s.Name.ToLower() == trimmedName.ToLower() && 
+                                                !s.IsDeleted);
 
-                if (existing != null)
-                    return BadRequest(new { message = "Specialization with this name already exists" });
+                    if (existing != null)
+                        return BadRequest(new { message = "Specialization with this name already exists" });
 
-                specialization.Name = trimmedName;
+                    specialization.Name = trimmedName;
+                }
             }
+            if (request.Description != null)
+                specialization.Description = request.Description.Trim();
+            if (request.IsActive.HasValue)
+                specialization.IsActive = request.IsActive.Value;
+
+            specialization.UpdatedAt = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+            await transaction.CommitAsync();
+
+            return Ok(new { message = "Specialization updated successfully" });
         }
-        if (request.Description != null)
-            specialization.Description = request.Description.Trim();
-        if (request.IsActive.HasValue)
-            specialization.IsActive = request.IsActive.Value;
-
-        specialization.UpdatedAt = DateTime.UtcNow;
-        await _context.SaveChangesAsync();
-
-        return Ok(new { message = "Specialization updated successfully" });
+        catch (Exception)
+        {
+            await transaction.RollbackAsync();
+            throw;
+        }
     }
 
     [HttpDelete("{id}")]
@@ -197,12 +217,22 @@ public class SpecializationsController : ControllerBase
         if (hasTeachers)
             return BadRequest(new { message = "Cannot delete specialization that is assigned to teachers. Please reassign teachers first." });
 
-        // Soft delete
-        specialization.IsDeleted = true;
-        specialization.UpdatedAt = DateTime.UtcNow;
-        await _context.SaveChangesAsync();
+        using var transaction = await _context.BeginTransactionAsync();
+        try
+        {
+            // Soft delete
+            specialization.IsDeleted = true;
+            specialization.UpdatedAt = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+            await transaction.CommitAsync();
 
-        return Ok(new { message = "Specialization deleted successfully" });
+            return Ok(new { message = "Specialization deleted successfully" });
+        }
+        catch (Exception)
+        {
+            await transaction.RollbackAsync();
+            throw;
+        }
     }
 }
 

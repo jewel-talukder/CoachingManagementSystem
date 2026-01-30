@@ -120,48 +120,58 @@ public class HolidaysController : ControllerBase
             return BadRequest(new { message = "At least one day of week is required for weekly off holidays" });
         }
 
-        var holiday = new Holiday
+        using var transaction = await _context.BeginTransactionAsync();
+        try
         {
-            CoachingId = coachingId.Value,
-            BranchId = request.BranchId,
-            Name = request.Name,
-            Description = request.Description,
-            HolidayType = request.HolidayType,
-            StartDate = request.StartDate.Date, // Store only date part
-            EndDate = request.EndDate?.Date, // Store only date part if provided
-            DaysOfWeek = request.DaysOfWeek != null && request.DaysOfWeek.Count > 0 
-                ? JsonSerializer.Serialize(request.DaysOfWeek) 
-                : null,
-            IsRecurring = request.IsRecurring,
-            IsActive = true,
-            CreatedAt = DateTime.UtcNow
-        };
+            var holiday = new Holiday
+            {
+                CoachingId = coachingId.Value,
+                BranchId = request.BranchId,
+                Name = request.Name,
+                Description = request.Description,
+                HolidayType = request.HolidayType,
+                StartDate = request.StartDate.Date, // Store only date part
+                EndDate = request.EndDate?.Date, // Store only date part if provided
+                DaysOfWeek = request.DaysOfWeek != null && request.DaysOfWeek.Count > 0 
+                    ? JsonSerializer.Serialize(request.DaysOfWeek) 
+                    : null,
+                IsRecurring = request.IsRecurring,
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow
+            };
 
-        _context.Holidays.Add(holiday);
-        await _context.SaveChangesAsync();
+            _context.Holidays.Add(holiday);
+            await _context.SaveChangesAsync();
+            await transaction.CommitAsync();
 
-        var holidayDto = new HolidayDto
+            var holidayDto = new HolidayDto
+            {
+                Id = holiday.Id,
+                CoachingId = holiday.CoachingId,
+                BranchId = holiday.BranchId,
+                BranchName = holiday.BranchId.HasValue 
+                    ? (await _context.Branches.FindAsync(holiday.BranchId.Value))?.Name ?? "Unknown"
+                    : "All Branches",
+                Name = holiday.Name,
+                Description = holiday.Description,
+                HolidayType = holiday.HolidayType,
+                StartDate = holiday.StartDate,
+                EndDate = holiday.EndDate,
+                DaysOfWeek = holiday.DaysOfWeek,
+                DaysOfWeekList = !string.IsNullOrEmpty(holiday.DaysOfWeek) 
+                    ? JsonSerializer.Deserialize<List<int>>(holiday.DaysOfWeek) 
+                    : null,
+                IsRecurring = holiday.IsRecurring,
+                IsActive = holiday.IsActive
+            };
+
+            return CreatedAtAction(nameof(GetById), new { id = holiday.Id }, holidayDto);
+        }
+        catch (Exception)
         {
-            Id = holiday.Id,
-            CoachingId = holiday.CoachingId,
-            BranchId = holiday.BranchId,
-            BranchName = holiday.BranchId.HasValue 
-                ? (await _context.Branches.FindAsync(holiday.BranchId.Value))?.Name ?? "Unknown"
-                : "All Branches",
-            Name = holiday.Name,
-            Description = holiday.Description,
-            HolidayType = holiday.HolidayType,
-            StartDate = holiday.StartDate,
-            EndDate = holiday.EndDate,
-            DaysOfWeek = holiday.DaysOfWeek,
-            DaysOfWeekList = !string.IsNullOrEmpty(holiday.DaysOfWeek) 
-                ? JsonSerializer.Deserialize<List<int>>(holiday.DaysOfWeek) 
-                : null,
-            IsRecurring = holiday.IsRecurring,
-            IsActive = holiday.IsActive
-        };
-
-        return CreatedAtAction(nameof(GetById), new { id = holiday.Id }, holidayDto);
+            await transaction.RollbackAsync();
+            throw;
+        }
     }
 
     [HttpPut("{id}")]
@@ -200,43 +210,53 @@ public class HolidaysController : ControllerBase
             return BadRequest(new { message = "At least one day of week is required for weekly off holidays" });
         }
 
-        holiday.BranchId = request.BranchId;
-        holiday.Name = request.Name;
-        holiday.Description = request.Description;
-        holiday.HolidayType = request.HolidayType;
-        holiday.StartDate = request.StartDate.Date; // Store only date part
-        holiday.EndDate = request.EndDate?.Date; // Store only date part if provided
-        holiday.DaysOfWeek = request.DaysOfWeek != null && request.DaysOfWeek.Count > 0 
-            ? JsonSerializer.Serialize(request.DaysOfWeek) 
-            : null;
-        holiday.IsRecurring = request.IsRecurring;
-        holiday.IsActive = request.IsActive;
-        holiday.UpdatedAt = DateTime.UtcNow;
-
-        await _context.SaveChangesAsync();
-
-        var holidayDto = new HolidayDto
+        using var transaction = await _context.BeginTransactionAsync();
+        try
         {
-            Id = holiday.Id,
-            CoachingId = holiday.CoachingId,
-            BranchId = holiday.BranchId,
-            BranchName = holiday.BranchId.HasValue 
-                ? (await _context.Branches.FindAsync(holiday.BranchId.Value))?.Name ?? "Unknown"
-                : "All Branches",
-            Name = holiday.Name,
-            Description = holiday.Description,
-            HolidayType = holiday.HolidayType,
-            StartDate = holiday.StartDate,
-            EndDate = holiday.EndDate,
-            DaysOfWeek = holiday.DaysOfWeek,
-            DaysOfWeekList = !string.IsNullOrEmpty(holiday.DaysOfWeek) 
-                ? JsonSerializer.Deserialize<List<int>>(holiday.DaysOfWeek) 
-                : null,
-            IsRecurring = holiday.IsRecurring,
-            IsActive = holiday.IsActive
-        };
+            holiday.BranchId = request.BranchId;
+            holiday.Name = request.Name;
+            holiday.Description = request.Description;
+            holiday.HolidayType = request.HolidayType;
+            holiday.StartDate = request.StartDate.Date; // Store only date part
+            holiday.EndDate = request.EndDate?.Date; // Store only date part if provided
+            holiday.DaysOfWeek = request.DaysOfWeek != null && request.DaysOfWeek.Count > 0 
+                ? JsonSerializer.Serialize(request.DaysOfWeek) 
+                : null;
+            holiday.IsRecurring = request.IsRecurring;
+            holiday.IsActive = request.IsActive;
+            holiday.UpdatedAt = DateTime.UtcNow;
 
-        return Ok(holidayDto);
+            await _context.SaveChangesAsync();
+            await transaction.CommitAsync();
+
+            var holidayDto = new HolidayDto
+            {
+                Id = holiday.Id,
+                CoachingId = holiday.CoachingId,
+                BranchId = holiday.BranchId,
+                BranchName = holiday.BranchId.HasValue 
+                    ? (await _context.Branches.FindAsync(holiday.BranchId.Value))?.Name ?? "Unknown"
+                    : "All Branches",
+                Name = holiday.Name,
+                Description = holiday.Description,
+                HolidayType = holiday.HolidayType,
+                StartDate = holiday.StartDate,
+                EndDate = holiday.EndDate,
+                DaysOfWeek = holiday.DaysOfWeek,
+                DaysOfWeekList = !string.IsNullOrEmpty(holiday.DaysOfWeek) 
+                    ? JsonSerializer.Deserialize<List<int>>(holiday.DaysOfWeek) 
+                    : null,
+                IsRecurring = holiday.IsRecurring,
+                IsActive = holiday.IsActive
+            };
+
+            return Ok(holidayDto);
+        }
+        catch (Exception)
+        {
+            await transaction.RollbackAsync();
+            throw;
+        }
     }
 
     [HttpDelete("{id}")]
@@ -253,12 +273,22 @@ public class HolidaysController : ControllerBase
         if (holiday == null)
             return NotFound(new { message = "Holiday not found" });
 
-        holiday.IsDeleted = true;
-        holiday.UpdatedAt = DateTime.UtcNow;
+        using var transaction = await _context.BeginTransactionAsync();
+        try
+        {
+            holiday.IsDeleted = true;
+            holiday.UpdatedAt = DateTime.UtcNow;
 
-        await _context.SaveChangesAsync();
+            await _context.SaveChangesAsync();
+            await transaction.CommitAsync();
 
-        return Ok(new { message = "Holiday deleted successfully" });
+            return Ok(new { message = "Holiday deleted successfully" });
+        }
+        catch (Exception)
+        {
+            await transaction.RollbackAsync();
+            throw;
+        }
     }
 
     private int? GetCoachingId()

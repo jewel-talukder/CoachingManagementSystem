@@ -33,6 +33,8 @@ public class UsersController : ControllerBase
         var usersQuery = _context.Users
             .Include(u => u.UserRoles)
                 .ThenInclude(ur => ur.Role)
+            .Include(u => u.Student)
+            .Include(u => u.Teacher)
             .Where(u => u.CoachingId == coachingId.Value && !u.IsDeleted);
 
         // Filter by branch if specified (for Students and Teachers)
@@ -85,13 +87,18 @@ public class UsersController : ControllerBase
             .Select(u => new UserListDto
             {
                 Id = u.Id,
+                StudentId = u.Student != null ? u.Student.Id : (int?)null,
+                TeacherId = u.Teacher != null ? u.Teacher.Id : (int?)null,
                 FirstName = u.FirstName,
                 LastName = u.LastName,
                 Email = u.Email,
                 Phone = u.Phone,
                 Roles = u.UserRoles.Select(ur => ur.Role.Name).ToList(),
                 IsActive = u.IsActive,
-                LastLoginAt = u.LastLoginAt
+                LastLoginAt = u.LastLoginAt,
+                StudentCode = u.Student != null ? u.Student.StudentCode : null,
+                ParentName = u.Student != null ? u.Student.ParentName : null,
+                ParentPhone = u.Student != null ? u.Student.ParentPhone : null
             })
             .ToListAsync();
 
@@ -166,7 +173,7 @@ public class UsersController : ControllerBase
             return BadRequest(new { message = "Branch is required for Students and Teachers" });
         }
 
-        // If branchId is provided, verify it exists and belongs to this coaching
+        // Check if branchId is provided, verify it exists and belongs to this coaching
         if (branchId.HasValue)
         {
             var branch = await _context.Branches
@@ -186,100 +193,153 @@ public class UsersController : ControllerBase
                 branchId = defaultBranch.Id;
         }
 
-        // Create user
-        var user = new User
+        using var transaction = await _context.BeginTransactionAsync();
+        try
         {
-            CoachingId = coachingId.Value,
-            FirstName = request.FirstName,
-            LastName = request.LastName,
-            Email = request.Email,
-            Phone = request.Phone,
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password),
-            IsActive = true
-        };
-
-        _context.Users.Add(user);
-        await _context.SaveChangesAsync();
-
-        // Assign roles
-        foreach (var role in roles)
-        {
-            var userRole = new UserRole
-            {
-                UserId = user.Id,
-                RoleId = role.Id
-            };
-            _context.UserRoles.Add(userRole);
-        }
-
-        // Create Teacher or Student record if needed
-        if (request.UserType == "Teacher")
-        {
-            EmploymentType employmentType = EmploymentType.FullTime;
-            if (request.AdditionalData?.ContainsKey("EmploymentType") == true)
-            {
-                var empTypeStr = request.AdditionalData["EmploymentType"]?.ToString();
-                if (Enum.TryParse<EmploymentType>(empTypeStr, out var empType))
-                {
-                    employmentType = empType;
-                }
-            }
-
-            decimal? salary = null;
-            if (request.AdditionalData?.ContainsKey("Salary") == true)
-            {
-                var salaryStr = request.AdditionalData["Salary"]?.ToString();
-                if (decimal.TryParse(salaryStr, out var salaryValue))
-                {
-                    salary = salaryValue;
-                }
-            }
-
-            var teacher = new Teacher
+            // Create user
+            var user = new User
             {
                 CoachingId = coachingId.Value,
-                BranchId = branchId.Value,
-                UserId = user.Id,
-                EmployeeCode = request.AdditionalData?.ContainsKey("EmployeeCode") == true 
-                    ? request.AdditionalData["EmployeeCode"]?.ToString() 
-                    : null,
-                QualificationId = request.AdditionalData?.ContainsKey("QualificationId") == true 
-                    ? (int.TryParse(request.AdditionalData["QualificationId"]?.ToString(), out var qualId) && qualId > 0 ? qualId : (int?)null)
-                    : null,
-                SpecializationId = request.AdditionalData?.ContainsKey("SpecializationId") == true 
-                    ? (int.TryParse(request.AdditionalData["SpecializationId"]?.ToString(), out var specId) && specId > 0 ? specId : (int?)null)
-                    : null,
-                EmploymentType = employmentType,
-                Salary = salary
+                FirstName = request.FirstName,
+                LastName = request.LastName,
+                Email = string.IsNullOrWhiteSpace(request.Email) ? null : request.Email,
+                Phone = request.Phone,
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password),
+                IsActive = true
             };
-            _context.Teachers.Add(teacher);
-        }
-        else if (request.UserType == "Student")
-        {
-            var student = new Student
+
+            _context.Users.Add(user);
+            await _context.SaveChangesAsync();
+
+            // Assign roles
+            foreach (var role in roles)
             {
-                CoachingId = coachingId.Value,
-                BranchId = branchId.Value,
-                UserId = user.Id,
-                StudentCode = request.AdditionalData?.ContainsKey("StudentCode") == true 
-                    ? request.AdditionalData["StudentCode"]?.ToString() 
-                    : null,
-                DateOfBirth = request.AdditionalData?.ContainsKey("DateOfBirth") == true 
-                    ? DateTime.Parse(request.AdditionalData["DateOfBirth"]!.ToString()!) 
-                    : null,
-                ParentName = request.AdditionalData?.ContainsKey("ParentName") == true 
-                    ? request.AdditionalData["ParentName"]?.ToString() 
-                    : null,
-                ParentPhone = request.AdditionalData?.ContainsKey("ParentPhone") == true 
-                    ? request.AdditionalData["ParentPhone"]?.ToString() 
-                    : null
-            };
-            _context.Students.Add(student);
+                var userRole = new UserRole
+                {
+                    UserId = user.Id,
+                    RoleId = role.Id
+                };
+                _context.UserRoles.Add(userRole);
+            }
+
+            // Create Teacher or Student record if needed
+            if (request.UserType == "Teacher")
+            {
+                EmploymentType employmentType = EmploymentType.FullTime;
+                if (request.AdditionalData?.ContainsKey("EmploymentType") == true)
+                {
+                    var empTypeStr = request.AdditionalData["EmploymentType"]?.ToString();
+                    if (Enum.TryParse<EmploymentType>(empTypeStr, out var empType))
+                    {
+                        employmentType = empType;
+                    }
+                }
+
+                decimal? salary = null;
+                if (request.AdditionalData?.ContainsKey("Salary") == true)
+                {
+                    var salaryStr = request.AdditionalData["Salary"]?.ToString();
+                    if (decimal.TryParse(salaryStr, out var salaryValue))
+                    {
+                        salary = salaryValue;
+                    }
+                }
+
+                // Auto-generate EmployeeCode: emp-01, emp-02, etc. (Coaching-wise)
+                string employeeCode = "emp-01";
+                var latestTeacher = await _context.Teachers
+                    .IgnoreQueryFilters()
+                    .Where(t => t.CoachingId == coachingId.Value && t.EmployeeCode != null && t.EmployeeCode.StartsWith("emp-"))
+                    .OrderByDescending(t => t.Id)
+                    .FirstOrDefaultAsync();
+
+                if (latestTeacher != null && !string.IsNullOrEmpty(latestTeacher.EmployeeCode))
+                {
+                    var parts = latestTeacher.EmployeeCode.Split('-');
+                    if (parts.Length == 2 && int.TryParse(parts[1], out int lastNumber))
+                    {
+                        employeeCode = $"emp-{(lastNumber + 1):D2}";
+                    }
+                }
+
+                var teacher = new Teacher
+                {
+                    CoachingId = coachingId.Value,
+                    BranchId = branchId.Value,
+                    UserId = user.Id,
+                    EmployeeCode = employeeCode,
+                    QualificationId = request.AdditionalData?.ContainsKey("QualificationId") == true 
+                        ? (int.TryParse(request.AdditionalData["QualificationId"]?.ToString(), out var qualId) && qualId > 0 ? qualId : (int?)null)
+                        : null,
+                    SpecializationId = request.AdditionalData?.ContainsKey("SpecializationId") == true 
+                        ? (int.TryParse(request.AdditionalData["SpecializationId"]?.ToString(), out var specId) && specId > 0 ? specId : (int?)null)
+                        : null,
+                    EmploymentType = employmentType,
+                    Salary = salary
+                };
+                _context.Teachers.Add(teacher);
+            }
+            else if (request.UserType == "Student")
+            {
+                // Auto-generate StudentCode: st-01, st-02, etc. (Coaching-wise)
+                string studentCode = "st-01";
+                var latestStudent = await _context.Students
+                    .IgnoreQueryFilters()
+                    .Where(s => s.CoachingId == coachingId.Value && s.StudentCode != null && s.StudentCode.StartsWith("st-"))
+                    .OrderByDescending(s => s.Id)
+                    .FirstOrDefaultAsync();
+
+                if (latestStudent != null && !string.IsNullOrEmpty(latestStudent.StudentCode))
+                {
+                    var parts = latestStudent.StudentCode.Split('-');
+                    if (parts.Length == 2 && int.TryParse(parts[1], out int lastNumber))
+                    {
+                        studentCode = $"st-{(lastNumber + 1):D2}";
+                    }
+                }
+
+                var student = new Student
+                {
+                    CoachingId = coachingId.Value,
+                    BranchId = branchId.Value,
+                    UserId = user.Id,
+                    StudentCode = studentCode,
+                    DateOfBirth = request.AdditionalData?.ContainsKey("DateOfBirth") == true 
+                        ? DateTime.Parse(request.AdditionalData["DateOfBirth"]!.ToString()!) 
+                        : null,
+                    ParentName = request.AdditionalData?.ContainsKey("ParentName") == true 
+                        ? request.AdditionalData["ParentName"]?.ToString() 
+                        : null,
+                    ParentPhone = request.AdditionalData?.ContainsKey("ParentPhone") == true 
+                        ? request.AdditionalData["ParentPhone"]?.ToString() 
+                        : null
+                };
+                _context.Students.Add(student);
+            }
+
+            await _context.SaveChangesAsync();
+            await transaction.CommitAsync();
+
+            // Get created student/teacher ID for the response
+            var createdStudentId = await _context.Students.Where(s => s.UserId == user.Id).Select(s => s.Id).FirstOrDefaultAsync();
+            var createdTeacherId = await _context.Teachers.Where(t => t.UserId == user.Id).Select(t => t.Id).FirstOrDefaultAsync();
+
+            return CreatedAtAction(nameof(GetAll), new { id = user.Id }, new { 
+                id = user.Id, 
+                studentId = createdStudentId != 0 ? createdStudentId : (int?)null,
+                teacherId = createdTeacherId != 0 ? createdTeacherId : (int?)null,
+                firstName = user.FirstName,
+                lastName = user.LastName,
+                email = user.Email,
+                phone = user.Phone,
+                isActive = user.IsActive
+            });
         }
-
-        await _context.SaveChangesAsync();
-
-        return CreatedAtAction(nameof(GetAll), new { id = user.Id }, user);
+        catch (Exception)
+        {
+            await transaction.RollbackAsync();
+            throw;
+        }
     }
 
     [HttpGet("{id}")]
@@ -409,9 +469,8 @@ public class UsersController : ControllerBase
                         }
                     }
                 }
-                student.StudentCode = request.AdditionalData.ContainsKey("StudentCode") 
-                    ? request.AdditionalData["StudentCode"]?.ToString() 
-                    : student.StudentCode;
+                // StudentCode is read-only and auto-generated, so we don't update it here.
+                
                 student.DateOfBirth = request.AdditionalData.ContainsKey("DateOfBirth") && 
                     !string.IsNullOrEmpty(request.AdditionalData["DateOfBirth"]?.ToString())
                     ? DateTime.Parse(request.AdditionalData["DateOfBirth"]!.ToString()!) 

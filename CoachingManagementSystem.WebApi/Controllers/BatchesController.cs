@@ -120,57 +120,66 @@ public class BatchesController : ControllerBase
             // This is a fallback for backward compatibility
         }
 
-        var batch = new Batch
+        using var transaction = await _context.BeginTransactionAsync();
+        try
         {
-            CoachingId = coachingId.Value,
-            BranchId = branchId.Value,
-            Name = request.Name,
-            Code = request.Code,
-            Description = request.Description,
-            TeacherId = request.TeacherId,
-            StartDate = request.StartDate,
-            EndDate = calculatedEndDate,
-            MaxStudents = request.MaxStudents,
-            MonthlyFee = request.MonthlyFee,
-            ScheduleDays = scheduleDaysJson,
-            StartTime = request.StartTime,
-            EndTime = request.EndTime,
-            IsActive = true,
-            CurrentStudents = 0
-        };
+            var batch = new Batch
+            {
+                CoachingId = coachingId.Value,
+                BranchId = branchId.Value,
+                Name = request.Name,
+                Code = request.Code,
+                Description = request.Description,
+                TeacherId = request.TeacherId,
+                StartDate = request.StartDate,
+                EndDate = calculatedEndDate,
+                MaxStudents = request.MaxStudents,
+                MonthlyFee = request.MonthlyFee,
+                ScheduleDays = scheduleDaysJson,
+                StartTime = request.StartTime,
+                EndTime = request.EndTime,
+                IsActive = true,
+                CurrentStudents = 0
+            };
 
-        _context.Batches.Add(batch);
-        await _context.SaveChangesAsync();
+            _context.Batches.Add(batch);
+            await _context.SaveChangesAsync();
+            await transaction.CommitAsync();
 
-        // Reload with related data to create DTO
-        var createdBatch = await _context.Batches
-            .Include(b => b.Teacher)
-                .ThenInclude(t => t!.User)
-            .FirstOrDefaultAsync(b => b.Id == batch.Id);
+            var createdBatch = await _context.Batches
+                .Include(b => b.Teacher)
+                    .ThenInclude(t => t!.User)
+                .FirstOrDefaultAsync(b => b.Id == batch.Id);
 
-        if (createdBatch == null)
-            return NotFound(new { message = "Batch not found after creation" });
+            if (createdBatch == null)
+                return NotFound(new { message = "Batch not found after creation" });
 
-        var batchDto = new BatchDto
+            var batchDto = new BatchDto
+            {
+                Id = createdBatch.Id,
+                Name = createdBatch.Name,
+                Code = createdBatch.Code,
+                Description = createdBatch.Description,
+                TeacherId = createdBatch.TeacherId,
+                TeacherName = createdBatch.Teacher != null ? $"{createdBatch.Teacher.User.FirstName} {createdBatch.Teacher.User.LastName}" : null,
+                StartDate = createdBatch.StartDate,
+                EndDate = createdBatch.EndDate,
+                MaxStudents = createdBatch.MaxStudents,
+                CurrentStudents = createdBatch.CurrentStudents,
+                MonthlyFee = createdBatch.MonthlyFee,
+                ScheduleDays = createdBatch.ScheduleDays,
+                StartTime = createdBatch.StartTime,
+                EndTime = createdBatch.EndTime,
+                IsActive = createdBatch.IsActive
+            };
+
+            return CreatedAtAction(nameof(GetAll), new { id = batchDto.Id }, batchDto);
+        }
+        catch (Exception)
         {
-            Id = createdBatch.Id,
-            Name = createdBatch.Name,
-            Code = createdBatch.Code,
-            Description = createdBatch.Description,
-            TeacherId = createdBatch.TeacherId,
-            TeacherName = createdBatch.Teacher != null ? $"{createdBatch.Teacher.User.FirstName} {createdBatch.Teacher.User.LastName}" : null,
-            StartDate = createdBatch.StartDate,
-            EndDate = createdBatch.EndDate,
-            MaxStudents = createdBatch.MaxStudents,
-            CurrentStudents = createdBatch.CurrentStudents,
-            MonthlyFee = createdBatch.MonthlyFee,
-            ScheduleDays = createdBatch.ScheduleDays,
-            StartTime = createdBatch.StartTime,
-            EndTime = createdBatch.EndTime,
-            IsActive = createdBatch.IsActive
-        };
-
-        return CreatedAtAction(nameof(GetAll), new { id = batchDto.Id }, batchDto);
+            await transaction.RollbackAsync();
+            throw;
+        }
     }
 
     [HttpGet("{id}")]
@@ -247,34 +256,44 @@ public class BatchesController : ControllerBase
             scheduleDaysJson = JsonSerializer.Serialize(request.DaySchedules);
         }
 
-        // Update batch properties
-        batch.Name = request.Name;
-        if (request.Code != null)
-            batch.Code = request.Code;
-        if (request.Description != null)
-            batch.Description = request.Description;
-        if (request.TeacherId.HasValue)
-            batch.TeacherId = request.TeacherId.Value;
-        if (request.StartDate.HasValue)
-            batch.StartDate = request.StartDate.Value;
-        if (request.EndDate.HasValue)
-            batch.EndDate = request.EndDate.Value;
-        if (request.MaxStudents.HasValue)
-            batch.MaxStudents = request.MaxStudents.Value;
-        if (request.MonthlyFee.HasValue)
-            batch.MonthlyFee = request.MonthlyFee.Value;
-        if (scheduleDaysJson != null)
-            batch.ScheduleDays = scheduleDaysJson;
-        if (request.StartTime.HasValue)
-            batch.StartTime = request.StartTime.Value;
-        if (request.EndTime.HasValue)
-            batch.EndTime = request.EndTime.Value;
-        batch.IsActive = request.IsActive;
-        batch.UpdatedAt = DateTime.UtcNow;
+        using var transaction = await _context.BeginTransactionAsync();
+        try
+        {
+            // Update batch properties
+            batch.Name = request.Name;
+            if (request.Code != null)
+                batch.Code = request.Code;
+            if (request.Description != null)
+                batch.Description = request.Description;
+            if (request.TeacherId.HasValue)
+                batch.TeacherId = request.TeacherId.Value;
+            if (request.StartDate.HasValue)
+                batch.StartDate = request.StartDate.Value;
+            if (request.EndDate.HasValue)
+                batch.EndDate = request.EndDate.Value;
+            if (request.MaxStudents.HasValue)
+                batch.MaxStudents = request.MaxStudents.Value;
+            if (request.MonthlyFee.HasValue)
+                batch.MonthlyFee = request.MonthlyFee.Value;
+            if (scheduleDaysJson != null)
+                batch.ScheduleDays = scheduleDaysJson;
+            if (request.StartTime.HasValue)
+                batch.StartTime = request.StartTime.Value;
+            if (request.EndTime.HasValue)
+                batch.EndTime = request.EndTime.Value;
+            batch.IsActive = request.IsActive;
+            batch.UpdatedAt = DateTime.UtcNow;
 
-        await _context.SaveChangesAsync();
+            await _context.SaveChangesAsync();
+            await transaction.CommitAsync();
 
-        return Ok(new { message = "Batch updated successfully" });
+            return Ok(new { message = "Batch updated successfully" });
+        }
+        catch (Exception)
+        {
+            await transaction.RollbackAsync();
+            throw;
+        }
     }
 
     [HttpDelete("{id}")]
@@ -300,13 +319,23 @@ public class BatchesController : ControllerBase
             return BadRequest(new { message = "Cannot delete batch with active enrollments. Please complete or cancel all enrollments first." });
         }
 
-        // Soft delete
-        batch.IsDeleted = true;
-        batch.UpdatedAt = DateTime.UtcNow;
+        using var transaction = await _context.BeginTransactionAsync();
+        try
+        {
+            // Soft delete
+            batch.IsDeleted = true;
+            batch.UpdatedAt = DateTime.UtcNow;
 
-        await _context.SaveChangesAsync();
+            await _context.SaveChangesAsync();
+            await transaction.CommitAsync();
 
-        return Ok(new { message = "Batch deleted successfully" });
+            return Ok(new { message = "Batch deleted successfully" });
+        }
+        catch (Exception)
+        {
+            await transaction.RollbackAsync();
+            throw;
+        }
     }
 
     private int? GetCoachingId()
