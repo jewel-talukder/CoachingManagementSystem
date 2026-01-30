@@ -15,10 +15,12 @@ namespace CoachingManagementSystem.WebApi.Controllers;
 public class TeachersController : ControllerBase
 {
     private readonly IApplicationDbContext _context;
+    private readonly IEmailService _emailService;
 
-    public TeachersController(IApplicationDbContext context)
+    public TeachersController(IApplicationDbContext context, IEmailService emailService)
     {
         _context = context;
+        _emailService = emailService;
     }
 
     private int? GetCoachingId()
@@ -144,6 +146,12 @@ public class TeachersController : ControllerBase
         if (branch == null)
             return BadRequest(new { message = "Branch not found" });
 
+        // Email is mandatory for teachers
+        if (string.IsNullOrWhiteSpace(request.Email))
+        {
+            return BadRequest(new { message = "Email is mandatory for teachers." });
+        }
+
         // Check if email already exists
         var existingUser = await _context.Users
             .FirstOrDefaultAsync(u => u.Email == request.Email && u.CoachingId == coachingId.Value && !u.IsDeleted);
@@ -227,6 +235,12 @@ public class TeachersController : ControllerBase
             await _context.SaveChangesAsync();
 
             await transaction.CommitAsync();
+
+            // Send welcome email
+            if (!string.IsNullOrEmpty(user.Email))
+            {
+                await _emailService.SendWelcomeEmailAsync(user.Email, $"{user.FirstName} {user.LastName}", user.Email, request.Password);
+            }
 
             return CreatedAtAction(nameof(GetById), new { id = teacher.Id }, teacher);
         }

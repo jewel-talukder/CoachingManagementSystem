@@ -16,10 +16,14 @@ namespace CoachingManagementSystem.WebApi.Controllers;
 public class UsersController : ControllerBase
 {
     private readonly IApplicationDbContext _context;
+    private readonly IEmailService _emailService;
+    private readonly ISmsService _smsService;
 
-    public UsersController(IApplicationDbContext context)
+    public UsersController(IApplicationDbContext context, IEmailService emailService, ISmsService smsService)
     {
         _context = context;
+        _emailService = emailService;
+        _smsService = smsService;
     }
 
     [HttpGet]
@@ -196,6 +200,16 @@ public class UsersController : ControllerBase
         using var transaction = await _context.BeginTransactionAsync();
         try
         {
+            if (request.UserType == "Teacher" && string.IsNullOrWhiteSpace(request.Email))
+            {
+                return BadRequest(new { message = "Email is mandatory for teachers." });
+            }
+
+            if (request.UserType == "Student" && string.IsNullOrWhiteSpace(request.Phone))
+            {
+                return BadRequest(new { message = "Phone number is mandatory for students." });
+            }
+
             // Create user
             var user = new User
             {
@@ -319,6 +333,19 @@ public class UsersController : ControllerBase
 
             await _context.SaveChangesAsync();
             await transaction.CommitAsync();
+
+            // Send welcome email for teachers
+            if (request.UserType == "Teacher" && !string.IsNullOrEmpty(user.Email))
+            {
+                await _emailService.SendWelcomeEmailAsync(user.Email, $"{user.FirstName} {user.LastName}", user.Email, request.Password);
+            }
+
+            // Send welcome SMS for students
+            if (request.UserType == "Student" && !string.IsNullOrEmpty(user.Phone))
+            {
+                var studentCode = await _context.Students.Where(s => s.UserId == user.Id).Select(s => s.StudentCode).FirstOrDefaultAsync();
+                await _smsService.SendStudentWelcomeSmsAsync(user.Phone, $"{user.FirstName} {user.LastName}", studentCode ?? "N/A");
+            }
 
             // Get created student/teacher ID for the response
             var createdStudentId = await _context.Students.Where(s => s.UserId == user.Id).Select(s => s.Id).FirstOrDefaultAsync();

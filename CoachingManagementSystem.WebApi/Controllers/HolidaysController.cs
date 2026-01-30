@@ -130,7 +130,7 @@ public class HolidaysController : ControllerBase
                 Name = request.Name,
                 Description = request.Description,
                 HolidayType = request.HolidayType,
-                StartDate = request.StartDate.Date, // Store only date part
+                StartDate = request.StartDate?.Date ?? DateTime.UtcNow.Date, // Store only date part or default to today
                 EndDate = request.EndDate?.Date, // Store only date part if provided
                 DaysOfWeek = request.DaysOfWeek != null && request.DaysOfWeek.Count > 0 
                     ? JsonSerializer.Serialize(request.DaysOfWeek) 
@@ -217,7 +217,7 @@ public class HolidaysController : ControllerBase
             holiday.Name = request.Name;
             holiday.Description = request.Description;
             holiday.HolidayType = request.HolidayType;
-            holiday.StartDate = request.StartDate.Date; // Store only date part
+            holiday.StartDate = request.StartDate?.Date ?? DateTime.UtcNow.Date; // Store only date part or default to today
             holiday.EndDate = request.EndDate?.Date; // Store only date part if provided
             holiday.DaysOfWeek = request.DaysOfWeek != null && request.DaysOfWeek.Count > 0 
                 ? JsonSerializer.Serialize(request.DaysOfWeek) 

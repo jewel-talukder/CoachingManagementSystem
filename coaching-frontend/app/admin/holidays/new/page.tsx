@@ -18,7 +18,7 @@ export default function NewHolidayPage() {
     name: '',
     description: '',
     holidayType: 'SingleDay', // 'SingleDay', 'DateRange', 'WeeklyOff', 'Government', 'Religious'
-    startDate: '',
+    startDate: new Date().toISOString().split('T')[0],
     endDate: '',
     daysOfWeek: [] as number[],
     isRecurring: false,
@@ -122,8 +122,8 @@ export default function NewHolidayPage() {
               required
               value={formData.holidayType}
               onChange={(e) => {
-                setFormData({ 
-                  ...formData, 
+                setFormData({
+                  ...formData,
                   holidayType: e.target.value,
                   endDate: '', // Reset end date when type changes
                   daysOfWeek: [], // Reset days of week when type changes

@@ -202,6 +202,29 @@ public class EnrollmentsController : ControllerBase
             batch.UpdatedAt = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
+
+            // Create a payment record if fee paid is greater than 0
+            if (request.FeePaid.HasValue && request.FeePaid.Value > 0)
+            {
+                var receiptNumber = $"RCP{DateTime.UtcNow:yyyyMMdd}{new Random().Next(1000, 9999)}";
+                var payment = new Payment
+                {
+                    CoachingId = coachingId.Value,
+                    BranchId = branchId.Value,
+                    StudentId = enrollment.StudentId,
+                    EnrollmentId = enrollment.Id,
+                    PaymentType = "Fee",
+                    Amount = request.FeePaid.Value,
+                    PaymentDate = DateTime.UtcNow,
+                    PaymentMethod = "Cash", // Default to Cash for manual enrollment payments
+                    Status = "Completed",
+                    ReceiptNumber = receiptNumber,
+                    Remarks = $"Initial payment during enrollment in {course.Name}"
+                };
+                _context.Payments.Add(payment);
+                await _context.SaveChangesAsync();
+            }
+
             await transaction.CommitAsync();
 
             return CreatedAtAction(nameof(GetById), new { id = enrollment.Id }, enrollment);

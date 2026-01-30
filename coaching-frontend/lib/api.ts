@@ -9,7 +9,7 @@ import axios from 'axios';
 // Force production URL if NEXT_PUBLIC_API_URL contains localhost in production build
 const getApiBaseUrl = () => {
   const envUrl = process.env.NEXT_PUBLIC_API_URL;
-  
+
   // If we have an environment variable, use it
   if (envUrl) {
     // In production builds, never allow localhost
@@ -19,12 +19,12 @@ const getApiBaseUrl = () => {
     }
     return envUrl;
   }
-  
+
   // Default fallbacks
   if (process.env.NODE_ENV === 'production') {
     return 'http://93.127.140.63:4000/api';
   }
-  
+
   // Development default
   return 'https://localhost:7286/api';
 };
@@ -51,7 +51,7 @@ api.interceptors.request.use(
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
       }
-      
+
       // Add branchId from store if available
       const branchStorage = localStorage.getItem('branch-storage');
       if (branchStorage) {
@@ -220,6 +220,15 @@ export const holidaysApi = {
   create: (data: any) => api.post('/holidays', data),
   update: (id: number, data: any) => api.put(`/holidays/${id}`, data),
   delete: (id: number) => api.delete(`/holidays/${id}`),
+};
+
+// Payments API
+export const paymentsApi = {
+  getAll: (params?: { studentId?: number; enrollmentId?: number; status?: string }) =>
+    api.get('/payments', { params }),
+  getById: (id: number) => api.get(`/payments/${id}`),
+  create: (data: any) => api.post('/payments', data),
+  initiateSsl: (data: any) => api.post('/payments/ssl/initiate', data),
 };
 
 // Super Admin API

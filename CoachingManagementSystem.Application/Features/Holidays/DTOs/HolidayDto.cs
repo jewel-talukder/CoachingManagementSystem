@@ -23,7 +23,7 @@ public class CreateHolidayRequest
     public string Name { get; set; } = string.Empty;
     public string? Description { get; set; }
     public string HolidayType { get; set; } = "SingleDay"; // "SingleDay", "DateRange", "WeeklyOff", "Government", "Religious"
-    public DateTime StartDate { get; set; }
+    public DateTime? StartDate { get; set; }
     public DateTime? EndDate { get; set; } // Required for DateRange type
     public List<int>? DaysOfWeek { get; set; } // Required for WeeklyOff type - array of day numbers [0,6] for Sunday and Saturday
     public bool IsRecurring { get; set; } = false; // For yearly recurring holidays
@@ -35,7 +35,7 @@ public class UpdateHolidayRequest
     public string Name { get; set; } = string.Empty;
     public string? Description { get; set; }
     public string HolidayType { get; set; } = "SingleDay";
-    public DateTime StartDate { get; set; }
+    public DateTime? StartDate { get; set; }
     public DateTime? EndDate { get; set; }
     public List<int>? DaysOfWeek { get; set; } // Array of day numbers [0,6] for weekly off
     public bool IsRecurring { get; set; }

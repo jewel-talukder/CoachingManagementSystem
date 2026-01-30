@@ -31,6 +31,12 @@ public static class DependencyInjection
         services.AddHttpClient();
         services.AddScoped<IPaymentService, SslPaymentService>();
 
+        // Email Service
+        services.AddScoped<IEmailService, EmailService>();
+
+        // SMS Service
+        services.AddScoped<ISmsService, SmsService>();
+
         // CQRS Handlers
         services.AddScoped<CoachingManagementSystem.Application.Features.Courses.Commands.CreateCourseCommandHandler>();
         services.AddScoped<CoachingManagementSystem.Application.Features.Courses.Queries.GetAllCoursesQueryHandler>();
