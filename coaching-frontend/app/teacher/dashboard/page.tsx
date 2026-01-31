@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { dashboardApi } from '@/lib/api';
-import { Calendar, Users, BookOpen } from 'lucide-react';
+import { Calendar, Users, BookOpen, Clock, ChevronRight } from 'lucide-react';
 
 export default function TeacherDashboard() {
   const [data, setData] = useState<any>(null);
@@ -46,6 +46,41 @@ export default function TeacherDashboard() {
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="px-4 py-6 sm:px-0">
           <h1 className="text-3xl font-bold text-gray-900 mb-6">My Dashboard</h1>
+
+          {/* Quick Actions */}
+          <div className="flex flex-col sm:flex-row gap-4 mb-8">
+            <button
+              onClick={() => window.location.href = '/teacher/attendance/self'}
+              className="flex-1 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl shadow-md p-4 text-white hover:shadow-lg transition-all transform hover:-translate-y-1 flex items-center justify-between group"
+            >
+              <div className="flex items-center">
+                <div className="p-3 bg-white/20 rounded-lg backdrop-blur-sm mr-4">
+                  <Clock className="w-6 h-6 text-white" />
+                </div>
+                <div className="text-left">
+                  <h3 className="font-bold text-lg">Self Check-In</h3>
+                  <p className="text-blue-100 text-sm">Mark your daily attendance</p>
+                </div>
+              </div>
+              <ChevronRight className="w-5 h-5 opacity-70 group-hover:opacity-100 transition-opacity" />
+            </button>
+
+            <button
+              onClick={() => window.location.href = '/teacher/attendance/mark'}
+              className="flex-1 bg-white border border-gray-200 rounded-xl shadow-sm p-4 text-gray-800 hover:shadow-md transition-all transform hover:-translate-y-1 flex items-center justify-between group"
+            >
+              <div className="flex items-center">
+                <div className="p-3 bg-blue-50 rounded-lg mr-4">
+                  <Users className="w-6 h-6 text-blue-600" />
+                </div>
+                <div className="text-left">
+                  <h3 className="font-bold text-lg">Student Attendance</h3>
+                  <p className="text-gray-500 text-sm">Mark attendance for batches</p>
+                </div>
+              </div>
+              <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-blue-600 transition-colors" />
+            </button>
+          </div>
 
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-3 mb-8">
             <div className="bg-white overflow-hidden shadow rounded-lg">

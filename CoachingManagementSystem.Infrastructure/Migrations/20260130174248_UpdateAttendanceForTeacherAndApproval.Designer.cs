@@ -4,6 +4,7 @@ using CoachingManagementSystem.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace CoachingManagementSystem.Infrastructure.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260130174248_UpdateAttendanceForTeacherAndApproval")]
+    partial class UpdateAttendanceForTeacherAndApproval
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -792,46 +795,6 @@ namespace CoachingManagementSystem.Infrastructure.Migrations
                     b.ToTable("Roles");
                 });
 
-            modelBuilder.Entity("CoachingManagementSystem.Domain.Entities.Shift", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<int>("CoachingId")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<TimeSpan>("EndTime")
-                        .HasColumnType("time");
-
-                    b.Property<int>("GraceTimeMinutes")
-                        .HasColumnType("int");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("bit");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<TimeSpan>("StartTime")
-                        .HasColumnType("time");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CoachingId");
-
-                    b.ToTable("Shifts");
-                });
-
             modelBuilder.Entity("CoachingManagementSystem.Domain.Entities.Specialization", b =>
                 {
                     b.Property<int>("Id")
@@ -1064,9 +1027,6 @@ namespace CoachingManagementSystem.Infrastructure.Migrations
                     b.Property<decimal?>("Salary")
                         .HasColumnType("decimal(18,2)");
 
-                    b.Property<int?>("ShiftId")
-                        .HasColumnType("int");
-
                     b.Property<int?>("SpecializationId")
                         .HasColumnType("int");
 
@@ -1081,8 +1041,6 @@ namespace CoachingManagementSystem.Infrastructure.Migrations
                     b.HasIndex("CoachingId");
 
                     b.HasIndex("QualificationId");
-
-                    b.HasIndex("ShiftId");
 
                     b.HasIndex("SpecializationId");
 
@@ -1503,17 +1461,6 @@ namespace CoachingManagementSystem.Infrastructure.Migrations
                     b.Navigation("Student");
                 });
 
-            modelBuilder.Entity("CoachingManagementSystem.Domain.Entities.Shift", b =>
-                {
-                    b.HasOne("CoachingManagementSystem.Domain.Entities.Coaching", "Coaching")
-                        .WithMany()
-                        .HasForeignKey("CoachingId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("Coaching");
-                });
-
             modelBuilder.Entity("CoachingManagementSystem.Domain.Entities.Specialization", b =>
                 {
                     b.HasOne("CoachingManagementSystem.Domain.Entities.Coaching", "Coaching")
@@ -1615,10 +1562,6 @@ namespace CoachingManagementSystem.Infrastructure.Migrations
                         .HasForeignKey("QualificationId")
                         .OnDelete(DeleteBehavior.SetNull);
 
-                    b.HasOne("CoachingManagementSystem.Domain.Entities.Shift", "Shift")
-                        .WithMany("Teachers")
-                        .HasForeignKey("ShiftId");
-
                     b.HasOne("CoachingManagementSystem.Domain.Entities.Specialization", "Specialization")
                         .WithMany("Teachers")
                         .HasForeignKey("SpecializationId")
@@ -1635,8 +1578,6 @@ namespace CoachingManagementSystem.Infrastructure.Migrations
                     b.Navigation("Coaching");
 
                     b.Navigation("Qualification");
-
-                    b.Navigation("Shift");
 
                     b.Navigation("Specialization");
 
@@ -1752,11 +1693,6 @@ namespace CoachingManagementSystem.Infrastructure.Migrations
             modelBuilder.Entity("CoachingManagementSystem.Domain.Entities.Role", b =>
                 {
                     b.Navigation("UserRoles");
-                });
-
-            modelBuilder.Entity("CoachingManagementSystem.Domain.Entities.Shift", b =>
-                {
-                    b.Navigation("Teachers");
                 });
 
             modelBuilder.Entity("CoachingManagementSystem.Domain.Entities.Specialization", b =>

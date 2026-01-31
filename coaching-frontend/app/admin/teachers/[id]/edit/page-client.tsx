@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import AdminLayout from '@/components/layouts/AdminLayout';
-import { teachersApi, branchesApi, qualificationsApi, specializationsApi } from '@/lib/api';
+import { teachersApi, branchesApi, qualificationsApi, specializationsApi, shiftsApi } from '@/lib/api';
 import { useToastStore } from '@/lib/store/toastStore';
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
@@ -18,6 +18,7 @@ export default function EditTeacherPageClient() {
   const [branches, setBranches] = useState<any[]>([]);
   const [qualifications, setQualifications] = useState<any[]>([]);
   const [specializations, setSpecializations] = useState<any[]>([]);
+  const [shifts, setShifts] = useState<any[]>([]);
 
   const [formData, setFormData] = useState({
     firstName: '',
@@ -32,6 +33,7 @@ export default function EditTeacherPageClient() {
     employmentType: '1',
     salary: '',
     isActive: true,
+    shiftId: '',
   });
 
   useEffect(() => {
@@ -40,6 +42,7 @@ export default function EditTeacherPageClient() {
       fetchBranches();
       fetchQualifications();
       fetchSpecializations();
+      fetchShifts();
     }
   }, [teacherId]);
 
@@ -61,6 +64,7 @@ export default function EditTeacherPageClient() {
         employmentType: teacher.employmentType?.toString() || '1',
         salary: teacher.salary?.toString() || '',
         isActive: teacher.isActive,
+        shiftId: teacher.shiftId?.toString() || '',
       });
     } catch (error: any) {
       console.error('Failed to fetch teacher:', error);
@@ -98,6 +102,15 @@ export default function EditTeacherPageClient() {
     }
   };
 
+  const fetchShifts = async () => {
+    try {
+      const response = await shiftsApi.getAll({ isActive: true });
+      setShifts(response.data || []);
+    } catch (error) {
+      console.error('Failed to fetch shifts:', error);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -116,6 +129,7 @@ export default function EditTeacherPageClient() {
         employmentType: parseInt(formData.employmentType),
         salary: formData.salary ? parseFloat(formData.salary) : null,
         isActive: formData.isActive,
+        shiftId: formData.shiftId ? parseInt(formData.shiftId) : null,
       });
 
       addToast('Teacher updated successfully!', 'success');
@@ -330,6 +344,22 @@ export default function EditTeacherPageClient() {
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
                 />
               </div>
+            </div>
+
+            <div className="mt-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Shift</label>
+              <select
+                value={formData.shiftId}
+                onChange={(e) => setFormData({ ...formData, shiftId: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+              >
+                <option value="">Select Shift</option>
+                {shifts.map((shift) => (
+                  <option key={shift.id} value={shift.id}>
+                    {shift.name} ({shift.startTime} - {shift.endTime})
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
 

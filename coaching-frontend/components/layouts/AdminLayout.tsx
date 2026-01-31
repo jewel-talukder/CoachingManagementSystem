@@ -3,7 +3,7 @@
 import { useAuthStore } from '@/lib/store/authStore';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, Suspense, lazy } from 'react';
-import { LayoutDashboard, Users, BookOpen, UsersRound, Settings, DollarSign, GraduationCap, Crown, Award, BookMarked, Building2, Calendar } from 'lucide-react';
+import { LayoutDashboard, Users, BookOpen, UsersRound, Settings, DollarSign, GraduationCap, Crown, Award, BookMarked, Building2, Calendar, CheckCircle, Timer } from 'lucide-react';
 
 // Lazy load components
 const AdminSidebar = lazy(() => import('./admin/AdminSidebar'));
@@ -95,6 +95,11 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       icon: UsersRound,
     },
     {
+      href: '/admin/shifts',
+      label: 'Shifts',
+      icon: Timer,
+    },
+    {
       href: '/admin/holidays',
       label: 'Holidays',
       icon: Calendar,
@@ -103,6 +108,11 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       href: '/admin/payments',
       label: 'Payment Due',
       icon: DollarSign,
+    },
+    {
+      href: '/admin/attendance/approve',
+      label: 'Approvals',
+      icon: CheckCircle,
     },
     {
       href: '/admin/subscription',

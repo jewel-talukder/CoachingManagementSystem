@@ -27,6 +27,7 @@ public interface IApplicationDbContext
     DbSet<Qualification> Qualifications { get; }
     DbSet<Specialization> Specializations { get; }
     DbSet<Holiday> Holidays { get; }
+    DbSet<Shift> Shifts { get; }
     
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
     Task<IDbContextTransaction> BeginTransactionAsync();

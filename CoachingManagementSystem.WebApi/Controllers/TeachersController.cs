@@ -46,6 +46,7 @@ public class TeachersController : ControllerBase
             .Include(t => t.Branch)
             .Include(t => t.Qualification)
             .Include(t => t.Specialization)
+            .Include(t => t.Shift)
             .Where(t => t.CoachingId == coachingId.Value && !t.IsDeleted && t.User != null && !t.User.IsDeleted);
 
         if (branchId.HasValue)
@@ -73,6 +74,8 @@ public class TeachersController : ControllerBase
                 JoiningDate = t.JoiningDate,
                 EmploymentType = t.EmploymentType,
                 Salary = t.Salary,
+                ShiftId = t.ShiftId,
+                ShiftName = t.Shift != null ? t.Shift.Name : null,
                 IsActive = t.User.IsActive
             })
             .ToListAsync();
@@ -93,6 +96,7 @@ public class TeachersController : ControllerBase
             .Include(t => t.Branch)
             .Include(t => t.Qualification)
             .Include(t => t.Specialization)
+            .Include(t => t.Shift)
             .FirstOrDefaultAsync(t => t.Id == id && t.CoachingId == coachingId.Value && !t.IsDeleted && !t.User.IsDeleted);
 
         if (teacher == null)
@@ -116,7 +120,9 @@ public class TeachersController : ControllerBase
             JoiningDate = teacher.JoiningDate,
             EmploymentType = teacher.EmploymentType,
             Salary = teacher.Salary,
-            IsActive = teacher.User.IsActive
+            IsActive = teacher.User.IsActive,
+            ShiftId = teacher.ShiftId,
+            ShiftName = teacher.Shift != null ? teacher.Shift.Name : null
         });
     }
 
@@ -191,45 +197,59 @@ public class TeachersController : ControllerBase
             _context.UserRoles.Add(userRole);
             await _context.SaveChangesAsync();
 
-        // Validate qualification if provided
-        int? qualificationId = null;
-        if (request.QualificationId.HasValue && request.QualificationId.Value > 0)
-        {
-            var qualification = await _context.Qualifications
-                .FirstOrDefaultAsync(q => q.Id == request.QualificationId.Value && 
-                                         q.CoachingId == coachingId.Value && 
-                                         !q.IsDeleted);
-            if (qualification == null)
-                return BadRequest(new { message = "Qualification not found" });
-            qualificationId = qualification.Id;
-        }
+            // Validate qualification if provided
+            int? qualificationId = null;
+            if (request.QualificationId.HasValue && request.QualificationId.Value > 0)
+            {
+                var qualification = await _context.Qualifications
+                    .FirstOrDefaultAsync(q => q.Id == request.QualificationId.Value && 
+                                             q.CoachingId == coachingId.Value && 
+                                             !q.IsDeleted);
+                if (qualification == null)
+                    return BadRequest(new { message = "Qualification not found" });
+                qualificationId = qualification.Id;
+            }
 
-        // Validate specialization if provided
-        int? specializationId = null;
-        if (request.SpecializationId.HasValue && request.SpecializationId.Value > 0)
-        {
-            var specialization = await _context.Specializations
-                .FirstOrDefaultAsync(s => s.Id == request.SpecializationId.Value && 
-                                         s.CoachingId == coachingId.Value && 
-                                         !s.IsDeleted);
-            if (specialization == null)
-                return BadRequest(new { message = "Specialization not found" });
-            specializationId = specialization.Id;
-        }
+            // Validate specialization if provided
+            int? specializationId = null;
+            if (request.SpecializationId.HasValue && request.SpecializationId.Value > 0)
+            {
+                var specialization = await _context.Specializations
+                    .FirstOrDefaultAsync(s => s.Id == request.SpecializationId.Value && 
+                                             s.CoachingId == coachingId.Value && 
+                                             !s.IsDeleted);
+                if (specialization == null)
+                    return BadRequest(new { message = "Specialization not found" });
+                specializationId = specialization.Id;
+            }
 
-        // Create teacher record
-        var teacher = new Teacher
-        {
-            CoachingId = coachingId.Value,
-            BranchId = branchId,
-            UserId = user.Id,
-            EmployeeCode = request.EmployeeCode,
-            QualificationId = qualificationId,
-            SpecializationId = specializationId,
-            JoiningDate = request.JoiningDate ?? DateTime.UtcNow,
-            EmploymentType = request.EmploymentType,
-            Salary = request.Salary
-        };
+            // Validate shift if provided
+            int? shiftId = null;
+            if (request.ShiftId.HasValue && request.ShiftId.Value > 0)
+            {
+                var shift = await _context.Shifts
+                    .FirstOrDefaultAsync(s => s.Id == request.ShiftId.Value && 
+                                             s.CoachingId == coachingId.Value && 
+                                             !s.IsDeleted);
+                if (shift == null)
+                    return BadRequest(new { message = "Shift not found" });
+                shiftId = shift.Id;
+            }
+
+            // Create teacher record
+            var teacher = new Teacher
+            {
+                CoachingId = coachingId.Value,
+                BranchId = branchId,
+                UserId = user.Id,
+                EmployeeCode = request.EmployeeCode,
+                QualificationId = qualificationId,
+                SpecializationId = specializationId,
+                JoiningDate = request.JoiningDate ?? DateTime.UtcNow,
+                EmploymentType = request.EmploymentType,
+                Salary = request.Salary,
+                ShiftId = shiftId
+            };
 
             _context.Teachers.Add(teacher);
             await _context.SaveChangesAsync();
@@ -337,8 +357,23 @@ public class TeachersController : ControllerBase
                 teacher.JoiningDate = request.JoiningDate;
             if (request.EmploymentType.HasValue)
                 teacher.EmploymentType = request.EmploymentType.Value;
-            if (request.Salary.HasValue)
-                teacher.Salary = request.Salary;
+            if (request.ShiftId.HasValue)
+            {
+                if (request.ShiftId.Value == 0)
+                {
+                    teacher.ShiftId = null;
+                }
+                else
+                {
+                    var shift = await _context.Shifts
+                        .FirstOrDefaultAsync(s => s.Id == request.ShiftId.Value && 
+                                                s.CoachingId == coachingId.Value && 
+                                                !s.IsDeleted);
+                    if (shift == null)
+                        return BadRequest(new { message = "Shift not found" });
+                    teacher.ShiftId = shift.Id;
+                }
+            }
 
             teacher.UpdatedAt = DateTime.UtcNow;
             teacher.User.UpdatedAt = DateTime.UtcNow;

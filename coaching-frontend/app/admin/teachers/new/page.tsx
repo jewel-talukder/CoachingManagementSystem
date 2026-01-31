@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import AdminLayout from '@/components/layouts/AdminLayout';
-import { teachersApi, branchesApi, qualificationsApi, specializationsApi } from '@/lib/api';
+import { teachersApi, branchesApi, qualificationsApi, specializationsApi, shiftsApi } from '@/lib/api';
 import { useToastStore } from '@/lib/store/toastStore';
 import { useBranchStore } from '@/lib/store/branchStore';
 import { ArrowLeft } from 'lucide-react';
@@ -13,10 +13,13 @@ export default function NewTeacherPage() {
   const router = useRouter();
   const { addToast } = useToastStore();
   const { selectedBranch } = useBranchStore();
-  const [loading, setLoading] = useState(false);
+  const [dataLoading, setDataLoading] = useState(true); // Renamed from 'loading' for initial data fetch
+  const [saving, setSaving] = useState(false); // New state for form submission
   const [branches, setBranches] = useState<any[]>([]);
   const [qualifications, setQualifications] = useState<any[]>([]);
   const [specializations, setSpecializations] = useState<any[]>([]);
+  const [shifts, setShifts] = useState<any[]>([]); // New state for shifts
+  const [errors, setErrors] = useState<Record<string, string>>({}); // New state for errors
 
   const [formData, setFormData] = useState({
     firstName: '',
@@ -29,50 +32,39 @@ export default function NewTeacherPage() {
     qualificationId: 0,
     specializationId: 0,
     joiningDate: new Date().toISOString().split('T')[0],
-    employmentType: '1', // 1 = FullTime, 2 = PerClass
-    salary: '',
+    employmentType: "FullTime",
+    salary: "",
+    shiftId: ""
   });
 
   useEffect(() => {
-    fetchBranches();
-    fetchQualifications();
-    fetchSpecializations();
-  }, []);
+    const fetchData = async () => {
+      try {
+        const [branchesRes, qualificationsRes, specializationsRes, shiftsRes] = await Promise.all([
+          branchesApi.getAll(),
+          qualificationsApi.getAll({ isActive: true }),
+          specializationsApi.getAll({ isActive: true }),
+          shiftsApi.getAll({ isActive: true })
+        ]);
 
-  const fetchBranches = async () => {
-    try {
-      const response = await branchesApi.getAll();
-      setBranches(response.data);
-      if (!formData.branchId && response.data.length > 0) {
-        const defaultBranch = response.data.find((b: any) => b.isDefault) || response.data[0];
-        setFormData({ ...formData, branchId: defaultBranch.id });
+        setBranches(branchesRes.data || []);
+        setQualifications(qualificationsRes.data || []);
+        setSpecializations(specializationsRes.data || []);
+        setShifts(shiftsRes.data || []);
+      } catch (error) {
+        console.error('Failed to fetch initial data:', error);
+        addToast('Failed to load initial data', 'error');
+      } finally {
+        setDataLoading(false);
       }
-    } catch (error) {
-      console.error('Failed to fetch branches:', error);
-    }
-  };
+    };
 
-  const fetchQualifications = async () => {
-    try {
-      const response = await qualificationsApi.getAll({ isActive: true });
-      setQualifications(response.data || []);
-    } catch (error) {
-      console.error('Failed to fetch qualifications:', error);
-    }
-  };
-
-  const fetchSpecializations = async () => {
-    try {
-      const response = await specializationsApi.getAll({ isActive: true });
-      setSpecializations(response.data || []);
-    } catch (error) {
-      console.error('Failed to fetch specializations:', error);
-    }
-  };
+    fetchData();
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
+    setSaving(true);
 
     try {
       await teachersApi.create({
@@ -84,10 +76,11 @@ export default function NewTeacherPage() {
         branchId: formData.branchId,
         employeeCode: formData.employeeCode || null,
         qualificationId: formData.qualificationId > 0 ? formData.qualificationId : null,
-        specializationId: formData.specializationId > 0 ? formData.specializationId : null,
-        joiningDate: formData.joiningDate || null,
+        specializationId: formData.specializationId > 0 ? formData.specializationId : null, // Kept original logic for specializationId
+        joiningDate: formData.joiningDate || null, // Kept original logic for joiningDate
         employmentType: parseInt(formData.employmentType),
         salary: formData.salary ? parseFloat(formData.salary) : null,
+        shiftId: formData.shiftId ? parseInt(formData.shiftId) : null, // Changed from 'shift' to 'shiftId' and parsed as integer
       });
 
       addToast('Teacher created successfully!', 'success');
@@ -95,7 +88,7 @@ export default function NewTeacherPage() {
     } catch (error: any) {
       addToast(error.response?.data?.message || 'Failed to create teacher', 'error');
     } finally {
-      setLoading(false);
+      setSaving(false); // Changed from setLoading to setSaving
     }
   };
 
@@ -277,6 +270,25 @@ export default function NewTeacherPage() {
                 </select>
               </div>
               <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Shift</label>
+                <select
+                  name="shiftId"
+                  value={formData.shiftId}
+                  onChange={(e) => setFormData({ ...formData, shiftId: e.target.value })}
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="">Select Shift</option>
+                  {shifts.map((shift) => (
+                    <option key={shift.id} value={shift.id}>
+                      {shift.name} ({shift.startTime} - {shift.endTime})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4 mt-4">
+              <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Salary {formData.employmentType === '1' ? '(Monthly)' : '(Per Class)'}
                 </label>
@@ -303,10 +315,10 @@ export default function NewTeacherPage() {
             </button>
             <button
               type="submit"
-              disabled={loading}
+              disabled={saving}
               className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
             >
-              {loading ? 'Creating...' : 'Create Teacher'}
+              {saving ? 'Creating...' : 'Create Teacher'}
             </button>
           </div>
         </form>

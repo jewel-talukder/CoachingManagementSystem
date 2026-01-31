@@ -20,6 +20,8 @@ public class TeacherDto
     public DateTime? JoiningDate { get; set; }
     public EmploymentType EmploymentType { get; set; }
     public decimal? Salary { get; set; }
+    public int? ShiftId { get; set; }
+    public string? ShiftName { get; set; }
     public bool IsActive { get; set; }
 }
 
@@ -37,6 +39,7 @@ public class CreateTeacherRequest
     public DateTime? JoiningDate { get; set; }
     public EmploymentType EmploymentType { get; set; } = EmploymentType.FullTime;
     public decimal? Salary { get; set; }
+    public int? ShiftId { get; set; }
 }
 
 public class UpdateTeacherRequest
@@ -53,5 +56,6 @@ public class UpdateTeacherRequest
     public EmploymentType? EmploymentType { get; set; }
     public decimal? Salary { get; set; }
     public bool? IsActive { get; set; }
+    public int? ShiftId { get; set; }
 }
 

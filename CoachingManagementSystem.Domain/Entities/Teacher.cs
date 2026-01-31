@@ -21,6 +21,9 @@ public class Teacher : BaseEntity
     public DateTime? JoiningDate { get; set; }
     public EmploymentType EmploymentType { get; set; } = EmploymentType.FullTime;
     public decimal? Salary { get; set; }
+    public int? ShiftId { get; set; }
+    public Shift? Shift { get; set; }
+
     
     // Navigation properties
     public ICollection<Course> Courses { get; set; } = new List<Course>();

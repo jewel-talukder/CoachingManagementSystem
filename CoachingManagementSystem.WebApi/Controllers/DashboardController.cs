@@ -89,10 +89,34 @@ public class DashboardController : ControllerBase
             return Unauthorized();
 
         var teacher = await _context.Teachers
-            .FirstOrDefaultAsync(t => t.CoachingId == coachingId.Value && t.UserId == userId && !t.IsDeleted);
+            .Include(t => t.User)
+            .Include(t => t.Shift)
+            .FirstOrDefaultAsync(t => t.UserId == userId && t.CoachingId == coachingId.Value && !t.IsDeleted);
 
         if (teacher == null)
-            return NotFound(new { message = "Teacher not found" });
+            return NotFound(new { message = "Teacher profile not found" });
+
+        // Get today's attendance
+        var todayAttendance = await _context.Attendances
+            .FirstOrDefaultAsync(a => a.TeacherId == teacher.Id 
+                && a.AttendanceDate.Date == DateTime.UtcNow.Date 
+                && !a.IsDeleted);
+
+        var profile = new
+        {
+            TeacherName = $"{teacher.User.FirstName} {teacher.User.LastName}",
+            EmployeeCode = teacher.EmployeeCode,
+            ShiftId = teacher.ShiftId,
+            ShiftName = teacher.Shift?.Name,
+            ShiftStart = teacher.Shift != null ? DateTime.Today.Add(teacher.Shift.StartTime).ToString("hh:mm tt") : null,
+            ShiftEnd = teacher.Shift != null ? DateTime.Today.Add(teacher.Shift.EndTime).ToString("hh:mm tt") : null,
+            TodayAttendance = todayAttendance != null ? new 
+            {
+                Status = todayAttendance.Status,
+                Time = todayAttendance.AttendanceDate.ToLocalTime().ToString("hh:mm tt"), // Adjust to local if needed or keep UTC
+                Remarks = todayAttendance.Remarks
+            } : null
+        };
 
         var assignedBatches = await _context.Batches
             .Where(b => b.CoachingId == coachingId.Value && b.TeacherId == teacher.Id && b.IsActive && !b.IsDeleted)
@@ -123,7 +147,13 @@ public class DashboardController : ControllerBase
         {
             AssignedBatches = assignedBatches,
             TodayClasses = todayClasses,
-            TotalStudents = totalStudents
+            TotalStudents = totalStudents,
+            Profile = new 
+            {
+                Name = $"{teacher.User.FirstName} {teacher.User.LastName}",
+                Shift = teacher.Shift,
+                EmployeeCode = teacher.EmployeeCode
+            }
         });
     }
 

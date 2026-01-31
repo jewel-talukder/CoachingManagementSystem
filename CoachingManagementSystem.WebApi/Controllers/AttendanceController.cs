@@ -38,6 +38,9 @@ public class AttendanceController : ControllerBase
             attendanceQuery = attendanceQuery.Where(a => a.AttendanceDate.Date == date.Value.Date);
         }
 
+        // Filter for Student attendance only, to avoid NRE on Student navigation property
+        attendanceQuery = attendanceQuery.Where(a => a.AttendanceType == "Student");
+
         var attendance = await attendanceQuery
             .Select(a => new
             {
@@ -91,6 +94,9 @@ public class AttendanceController : ControllerBase
                     existing.Status = item.Status;
                     existing.Remarks = item.Remarks;
                     existing.UpdatedAt = DateTime.UtcNow;
+                    // Ensure type and approval are correct for student attendance
+                    existing.AttendanceType = "Student";
+                    existing.IsApproved = true; 
                 }
                 else
                 {
@@ -102,7 +108,10 @@ public class AttendanceController : ControllerBase
                         AttendanceDate = request.Date,
                         Status = item.Status,
                         Remarks = item.Remarks,
-                        MarkedByUserId = userId
+                        MarkedByUserId = userId,
+                        AttendanceType = "Student",
+                        IsApproved = true,
+                        ApprovedByUserId = userId, // Auto-approve student attendance marked by teacher/admin
                     };
                     attendances.Add(attendance);
                 }
@@ -123,6 +132,126 @@ public class AttendanceController : ControllerBase
             await transaction.RollbackAsync();
             throw;
         }
+    }
+
+    [HttpPost("teacher/self")]
+    [Authorize(Roles = "Teacher")]
+    public async Task<ActionResult> SubmitSelfAttendance([FromBody] TeacherAttendanceRequest request)
+    {
+        var coachingId = GetCoachingId();
+        if (coachingId == null) return Unauthorized();
+
+        var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+        
+        // Find the teacher profile associated with this user
+        var teacher = await _context.Teachers
+            .Include(t => t.Shift)
+            .FirstOrDefaultAsync(t => t.UserId == userId && t.CoachingId == coachingId.Value && !t.IsDeleted);
+
+        if (teacher == null)
+            return BadRequest(new { message = "Teacher profile not found for current user." });
+
+        var date = request.Date.Date;
+
+        // Check internal duplicates
+        var existing = await _context.Attendances
+            .FirstOrDefaultAsync(a => a.TeacherId == teacher.Id
+                && a.AttendanceDate.Date == date
+                && !a.IsDeleted);
+
+        if (existing != null)
+        {
+            return BadRequest(new { message = "Attendance already submitted for this date." });
+        }
+
+        // Auto-calculate status based on Shift
+        string status = "Present";
+        if (teacher.Shift != null)
+        {
+            var checkInTime = request.Date.TimeOfDay;
+            var shiftStart = teacher.Shift.StartTime;
+            var graceTime = TimeSpan.FromMinutes(teacher.Shift.GraceTimeMinutes);
+            
+            if (checkInTime > shiftStart.Add(graceTime))
+            {
+                status = "Late";
+            }
+        }
+        else
+        {
+            // If no shift assigned, use fallback or user provided status? 
+            // For now, let's default to Present or respect request if we want to allow manual override when no shift.
+            // Requirement implies strict shift logic. Defaulting to Present for no-shift teachers.
+            status = "Present";
+        }
+
+        var attendance = new Attendance
+        {
+            CoachingId = coachingId.Value,
+            TeacherId = teacher.Id,
+            AttendanceDate = request.Date, 
+            Status = status, 
+            Remarks = request.Remarks,
+            AttendanceType = "Teacher",
+            IsApproved = false, // Requires admin approval
+            MarkedByUserId = userId
+        };
+
+        _context.Attendances.Add(attendance);
+        await _context.SaveChangesAsync();
+
+        return Ok(new { message = "Attendance submitted successfully. Pending approval." });
+    }
+
+    [HttpGet("pending")]
+    [Authorize(Roles = "Coaching Admin,Super Admin")]
+    public async Task<ActionResult> GetPendingAttendance()
+    {
+        var coachingId = GetCoachingId();
+        if (coachingId == null) return Unauthorized();
+
+        var pending = await _context.Attendances
+            .Include(a => a.Teacher)
+                .ThenInclude(t => t.User)
+            .Where(a => a.CoachingId == coachingId.Value 
+                && !a.IsApproved 
+                && !a.IsDeleted
+                && a.AttendanceType == "Teacher")
+            .OrderByDescending(a => a.AttendanceDate)
+            .Select(a => new
+            {
+                a.Id,
+                TeacherName = $"{a.Teacher.User.FirstName} {a.Teacher.User.LastName}",
+                a.AttendanceDate,
+                a.Status,
+                a.Remarks
+            })
+            .ToListAsync();
+
+        return Ok(pending);
+    }
+
+    [HttpPost("approve/{id}")]
+    [Authorize(Roles = "Coaching Admin,Super Admin")]
+    public async Task<ActionResult> ApproveAttendance(int id)
+    {
+        var coachingId = GetCoachingId();
+        if (coachingId == null) return Unauthorized();
+
+        var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+
+        var attendance = await _context.Attendances
+            .FirstOrDefaultAsync(a => a.Id == id && a.CoachingId == coachingId.Value);
+
+        if (attendance == null) return NotFound();
+
+        attendance.IsApproved = true;
+        attendance.ApprovedByUserId = userId;
+        attendance.UpdatedAt = DateTime.UtcNow;
+
+        await _context.SaveChangesAsync();
+
+        return Ok(new { message = "Attendance approved." });
     }
 
     [HttpGet("student/{studentId}")]
@@ -152,10 +281,11 @@ public class AttendanceController : ControllerBase
             {
                 Id = a.Id,
                 BatchId = a.BatchId,
-                BatchName = a.Batch.Name,
+                BatchName = a.Batch != null ? a.Batch.Name : "N/A",
                 AttendanceDate = a.AttendanceDate,
                 Status = a.Status,
-                Remarks = a.Remarks
+                Remarks = a.Remarks,
+                IsApproved = a.IsApproved
             })
             .ToListAsync();
 
@@ -200,6 +330,13 @@ public class AttendanceItem
 {
     public int StudentId { get; set; }
     public string Status { get; set; } = "Present"; // Present, Absent, Late, Excused
+    public string? Remarks { get; set; }
+}
+
+public class TeacherAttendanceRequest
+{
+    public DateTime Date { get; set; }
+    public string? Status { get; set; } // Optional, calculated by backend
     public string? Remarks { get; set; }
 }
 

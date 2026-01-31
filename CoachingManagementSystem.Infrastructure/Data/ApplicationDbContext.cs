@@ -32,6 +32,7 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<Holiday> Holidays { get; set; }
     public DbSet<Qualification> Qualifications { get; set; }
     public DbSet<Specialization> Specializations { get; set; }
+    public DbSet<Shift> Shifts { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -278,6 +279,12 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
             .HasForeignKey(h => h.BranchId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        modelBuilder.Entity<Shift>()
+            .HasOne(s => s.Coaching)
+            .WithMany()
+            .HasForeignKey(s => s.CoachingId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         // Soft delete filter
         modelBuilder.Entity<Coaching>().HasQueryFilter(c => !c.IsDeleted);
         modelBuilder.Entity<Branch>().HasQueryFilter(b => !b.IsDeleted);
@@ -291,6 +298,7 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
         modelBuilder.Entity<Qualification>().HasQueryFilter(q => !q.IsDeleted);
         modelBuilder.Entity<Specialization>().HasQueryFilter(s => !s.IsDeleted);
         modelBuilder.Entity<Holiday>().HasQueryFilter(h => !h.IsDeleted);
+        modelBuilder.Entity<Shift>().HasQueryFilter(s => !s.IsDeleted);
     }
 
     public Task<IDbContextTransaction> BeginTransactionAsync()

@@ -153,6 +153,10 @@ export const attendanceApi = {
   mark: (data: any) => api.post('/attendance', data),
   getStudent: (studentId: number, params?: { batchId?: number; startDate?: string; endDate?: string }) =>
     api.get(`/attendance/student/${studentId}`, { params }),
+  submitSelf: (data: { date: string; status: string; remarks?: string }) =>
+    api.post('/attendance/teacher/self', data),
+  getPending: () => api.get('/attendance/pending'),
+  approve: (id: number) => api.post(`/attendance/approve/${id}`),
 };
 
 // Exams API
@@ -211,6 +215,16 @@ export const specializationsApi = {
   create: (data: any) => api.post('/specializations', data),
   update: (id: number, data: any) => api.put(`/specializations/${id}`, data),
   delete: (id: number) => api.delete(`/specializations/${id}`),
+};
+
+// Shifts API
+export const shiftsApi = {
+  getAll: (params?: { isActive?: boolean }) =>
+    api.get('/shifts', { params }),
+  getById: (id: number) => api.get(`/shifts/${id}`),
+  create: (data: any) => api.post('/shifts', data),
+  update: (id: number, data: any) => api.put(`/shifts/${id}`, data),
+  delete: (id: number) => api.delete(`/shifts/${id}`),
 };
 
 // Holidays API
