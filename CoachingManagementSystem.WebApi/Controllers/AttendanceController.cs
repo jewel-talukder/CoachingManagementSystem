@@ -170,11 +170,35 @@ public class AttendanceController : ControllerBase
         {
             var checkInTime = request.Date.TimeOfDay;
             var shiftStart = teacher.Shift.StartTime;
+            var shiftEnd = teacher.Shift.EndTime;
             var graceTime = TimeSpan.FromMinutes(teacher.Shift.GraceTimeMinutes);
             
-            if (checkInTime > shiftStart.Add(graceTime))
+            // If shift is within the same day
+            if (shiftEnd > shiftStart)
             {
-                status = "Late";
+                 if (checkInTime > shiftEnd)
+                 {
+                     status = "Absent";
+                 }
+                 else if (checkInTime > shiftStart.Add(graceTime))
+                 {
+                     status = "Late";
+                 }
+            }
+            else // Night shift (crossing midnight) handling - simplistic check
+            {
+                 // Complex to handle without full date context shift assignment, 
+                 // but for now assuming if checkIn is "late" relative to start
+                 // We kept it simple. 
+                 // If checkIn > ShiftStart + Grace (e.g. 23:00 > 22:30) -> Late
+                 // If checkIn > ShiftEnd (e.g. 07:00 > 06:00) -> Absent? 
+                 // (Need to be careful about AM/PM comparisons).
+                 
+                 // Fallback to basic Late calculation for night shifts to avoid bug
+                 if (checkInTime > shiftStart.Add(graceTime) || (checkInTime < shiftStart && checkInTime > shiftEnd)) 
+                 {
+                      status = "Late"; // Simplified
+                 }
             }
         }
         else
@@ -213,6 +237,8 @@ public class AttendanceController : ControllerBase
         var pending = await _context.Attendances
             .Include(a => a.Teacher)
                 .ThenInclude(t => t.User)
+            .Include(a => a.Teacher)
+                .ThenInclude(t => t.Shift)
             .Where(a => a.CoachingId == coachingId.Value 
                 && !a.IsApproved 
                 && !a.IsDeleted
@@ -224,7 +250,10 @@ public class AttendanceController : ControllerBase
                 TeacherName = $"{a.Teacher.User.FirstName} {a.Teacher.User.LastName}",
                 a.AttendanceDate,
                 a.Status,
-                a.Remarks
+                a.Remarks,
+                ShiftName = a.Teacher.Shift != null ? a.Teacher.Shift.Name : "No Shift",
+                ShiftStartTime = a.Teacher.Shift != null ? a.Teacher.Shift.StartTime.ToString() : null,
+                ShiftEndTime = a.Teacher.Shift != null ? a.Teacher.Shift.EndTime.ToString() : null,
             })
             .ToListAsync();
 
@@ -305,6 +334,74 @@ public class AttendanceController : ControllerBase
                 Absent = absent,
                 Percentage = Math.Round(percentage, 2)
             }
+        });
+    }
+
+    [HttpGet("teacher/history")]
+    [Authorize(Roles = "Coaching Admin,Super Admin")]
+    public async Task<ActionResult> GetTeacherAttendance(
+        [FromQuery] int? teacherId, 
+        [FromQuery] DateTime? startDate, 
+        [FromQuery] DateTime? endDate,
+        [FromQuery] int? branchId,
+        [FromQuery] int page = 1,
+        [FromQuery] int limit = 20)
+    {
+        var coachingId = GetCoachingId();
+        if (coachingId == null) return Unauthorized();
+
+        var query = _context.Attendances
+            .Include(a => a.Teacher)
+                .ThenInclude(t => t.User)
+            .Include(a => a.Teacher)
+                .ThenInclude(t => t.Shift)
+            .Include(a => a.ApprovedByUser)
+            .Where(a => a.CoachingId == coachingId.Value 
+                && !a.IsDeleted
+                && a.AttendanceType == "Teacher"
+                && a.IsApproved);
+
+        if (branchId.HasValue)
+            query = query.Where(a => a.Teacher.BranchId == branchId.Value);
+
+        if (teacherId.HasValue)
+            query = query.Where(a => a.TeacherId == teacherId.Value);
+
+        if (startDate.HasValue)
+            query = query.Where(a => a.AttendanceDate.Date >= startDate.Value.Date);
+
+        if (endDate.HasValue)
+            query = query.Where(a => a.AttendanceDate.Date <= endDate.Value.Date);
+
+        // Calculate total count before pagination
+        var total = await query.CountAsync();
+
+        var history = await query
+            .OrderByDescending(a => a.AttendanceDate)
+            .Skip((page - 1) * limit)
+            .Take(limit)
+            .Select(a => new
+            {
+                a.Id,
+                TeacherName = $"{a.Teacher.User.FirstName} {a.Teacher.User.LastName}",
+                TeacherImage = a.Teacher.User.ProfilePicture,
+                a.AttendanceDate,
+                a.Status,
+                a.Remarks,
+                ShiftName = a.Teacher.Shift != null ? a.Teacher.Shift.Name : "No Shift",
+                ShiftStartTime = a.Teacher.Shift != null ? a.Teacher.Shift.StartTime.ToString() : null,
+                ShiftEndTime = a.Teacher.Shift != null ? a.Teacher.Shift.EndTime.ToString() : null,
+                ApprovedBy = a.ApprovedByUser != null ? $"{a.ApprovedByUser.FirstName} {a.ApprovedByUser.LastName}" : "System/Auto"
+            })
+            .ToListAsync();
+
+        return Ok(new 
+        {
+            Data = history,
+            Total = total,
+            Page = page,
+            Limit = limit,
+            TotalPages = (int)Math.Ceiling(total / (double)limit)
         });
     }
 

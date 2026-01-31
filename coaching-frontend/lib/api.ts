@@ -157,6 +157,8 @@ export const attendanceApi = {
     api.post('/attendance/teacher/self', data),
   getPending: () => api.get('/attendance/pending'),
   approve: (id: number) => api.post(`/attendance/approve/${id}`),
+  getTeacherHistory: (params?: { teacherId?: number; startDate?: string; endDate?: string, branchId?: number, page?: number, limit?: number }) =>
+    api.get('/attendance/teacher/history', { params }),
 };
 
 // Exams API

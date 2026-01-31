@@ -3,7 +3,7 @@
 import { useAuthStore } from '@/lib/store/authStore';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, Suspense, lazy } from 'react';
-import { LayoutDashboard, Users, BookOpen, UsersRound, Settings, DollarSign, GraduationCap, Crown, Award, BookMarked, Building2, Calendar, CheckCircle, Timer } from 'lucide-react';
+import { LayoutDashboard, Users, BookOpen, UsersRound, Settings, DollarSign, GraduationCap, Crown, Award, BookMarked, Building2, Calendar, CheckCircle, Timer, History } from 'lucide-react';
 
 // Lazy load components
 const AdminSidebar = lazy(() => import('./admin/AdminSidebar'));
@@ -113,6 +113,11 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       href: '/admin/attendance/approve',
       label: 'Approvals',
       icon: CheckCircle,
+    },
+    {
+      href: '/admin/attendance/history',
+      label: 'History',
+      icon: History,
     },
     {
       href: '/admin/subscription',

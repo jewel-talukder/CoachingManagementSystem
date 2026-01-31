@@ -37,8 +37,10 @@ export default function TeacherSelfAttendancePage() {
     const router = useRouter();
 
     const [profile, setProfile] = useState<Profile | null>(null);
+    const [mounted, setMounted] = useState(false);
 
     useEffect(() => {
+        setMounted(true);
         const timer = setInterval(() => setCurrentTime(new Date()), 1000);
         fetchProfile();
         return () => clearInterval(timer);
@@ -92,8 +94,18 @@ export default function TeacherSelfAttendancePage() {
         setLoading(true);
         try {
             // calculated "status" here is just for display, backend recalculates it to be safe
+
+            // Create local ISO string to ensure backend receives the local time for comparison with Shift Times
+            const now = new Date();
+            const localIsoString = new Date(now.getTime() - (now.getTimezoneOffset() * 60000)).toISOString(); // e.g. 2026-02-01T02:22:24.000Z - wait, converting to local representation
+            // The trick: creating a date object that *looks* like local time in UTC methods, then stripping Z is risky if not careful.
+            // Better: just format it manually or use the offset trick strictly.
+            // new Date(now.getTime() - (now.getTimezoneOffset() * 60000)) -> This creates a date shifted by offset. .toISOString() gives the "local numbers" followed by Z.
+            // We strip the Z to tell backend "This is Unspecified/Local time".
+            const localDateToSend = new Date(now.getTime() - (now.getTimezoneOffset() * 60000)).toISOString().slice(0, -1);
+
             await attendanceApi.submitSelf({
-                date: new Date().toISOString(),
+                date: localDateToSend,
                 status: calculatedStatus, // Backend ignores this usually or uses as fallback
                 remarks
             });
@@ -138,12 +150,12 @@ export default function TeacherSelfAttendancePage() {
                     <div className="space-y-6">
                         <div className="bg-white rounded-2xl shadow-xl overflow-hidden border border-blue-100">
                             <div className="bg-gradient-to-tr from-blue-600 to-indigo-700 p-8 text-white text-center">
-                                <h2 className="text-5xl font-extrabold tracking-tight mb-2 font-mono">
-                                    {timeString}
+                                <h2 className="text-5xl font-extrabold tracking-tight mb-2 font-mono min-h-[48px]">
+                                    {mounted ? timeString : <span className="text-4xl opacity-50">Loading...</span>}
                                 </h2>
                                 <p className="text-blue-100 font-medium text-lg flex items-center justify-center">
                                     <Calendar className="w-5 h-5 mr-2" />
-                                    {dateString}
+                                    {mounted ? dateString : ''}
                                 </p>
                                 {profile?.shift && (
                                     <div className="mt-4 flex flex-col items-center justify-center space-y-2">
