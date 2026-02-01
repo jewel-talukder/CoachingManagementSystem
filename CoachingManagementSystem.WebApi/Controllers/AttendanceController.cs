@@ -229,12 +229,12 @@ public class AttendanceController : ControllerBase
 
     [HttpGet("pending")]
     [Authorize(Roles = "Coaching Admin,Super Admin")]
-    public async Task<ActionResult> GetPendingAttendance()
+    public async Task<ActionResult> GetPendingAttendance([FromQuery] int? branchId)
     {
         var coachingId = GetCoachingId();
         if (coachingId == null) return Unauthorized();
 
-        var pending = await _context.Attendances
+        var query = _context.Attendances
             .Include(a => a.Teacher)
                 .ThenInclude(t => t.User)
             .Include(a => a.Teacher)
@@ -242,7 +242,14 @@ public class AttendanceController : ControllerBase
             .Where(a => a.CoachingId == coachingId.Value 
                 && !a.IsApproved 
                 && !a.IsDeleted
-                && a.AttendanceType == "Teacher")
+                && a.AttendanceType == "Teacher");
+
+        if (branchId.HasValue)
+        {
+            query = query.Where(a => a.Teacher.BranchId == branchId.Value);
+        }
+
+        var pending = await query
             .OrderByDescending(a => a.AttendanceDate)
             .Select(a => new
             {

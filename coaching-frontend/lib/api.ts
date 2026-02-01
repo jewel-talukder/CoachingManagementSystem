@@ -116,7 +116,7 @@ export const coursesApi = {
 
 // Batches API
 export const batchesApi = {
-  getAll: (params?: { courseId?: number; isActive?: boolean }) =>
+  getAll: (params?: { courseId?: number; isActive?: boolean; branchId?: number }) =>
     api.get('/batches', { params }),
   getById: (id: number) => api.get(`/batches/${id}`),
   create: (data: any) => api.post('/batches', data),
@@ -126,7 +126,7 @@ export const batchesApi = {
 
 // Users API
 export const usersApi = {
-  getAll: (params?: { role?: string; isActive?: boolean }) =>
+  getAll: (params?: { role?: string; isActive?: boolean; branchId?: number }) =>
     api.get('/users', { params }),
   getById: (id: number) => api.get(`/users/${id}`),
   create: (data: any) => api.post('/users', data),
@@ -155,7 +155,7 @@ export const attendanceApi = {
     api.get(`/attendance/student/${studentId}`, { params }),
   submitSelf: (data: { date: string; status: string; remarks?: string }) =>
     api.post('/attendance/teacher/self', data),
-  getPending: () => api.get('/attendance/pending'),
+  getPending: (params?: { branchId?: number }) => api.get('/attendance/pending', { params }),
   approve: (id: number) => api.post(`/attendance/approve/${id}`),
   getTeacherHistory: (params?: { teacherId?: number; startDate?: string; endDate?: string, branchId?: number, page?: number, limit?: number }) =>
     api.get('/attendance/teacher/history', { params }),

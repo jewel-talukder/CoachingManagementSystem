@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { attendanceApi } from '@/lib/api';
+import { useBranchStore } from '@/lib/store/branchStore';
 import { useToastStore } from '@/lib/store/toastStore';
 import AdminLayout from '@/components/layouts/AdminLayout';
 import {
@@ -17,14 +18,16 @@ export default function AttendanceApprovalPage() {
     const [pendingList, setPendingList] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const { addToast } = useToastStore();
+    const { selectedBranch } = useBranchStore();
 
     useEffect(() => {
         fetchPending();
-    }, []);
+    }, [selectedBranch?.id]);
 
     const fetchPending = async () => {
         try {
-            const response = await attendanceApi.getPending();
+            setLoading(true);
+            const response = await attendanceApi.getPending({ branchId: selectedBranch?.id });
             setPendingList(response.data);
         } catch (error) {
             console.error('Failed to fetch pending attendance', error);

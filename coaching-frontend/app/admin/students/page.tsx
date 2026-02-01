@@ -6,6 +6,7 @@ import { usersApi, enrollmentsApi } from '@/lib/api';
 import { Plus, Search, DollarSign, Edit, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import { useSettingsStore } from '@/lib/store/settingsStore';
+import { useBranchStore } from '@/lib/store/branchStore';
 import { useToastStore } from '@/lib/store/toastStore';
 
 export default function StudentsPage() {
@@ -17,14 +18,16 @@ export default function StudentsPage() {
   const { paymentMode } = useSettingsStore();
   const { addToast } = useToastStore();
 
+  const { selectedBranch } = useBranchStore();
+
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [selectedBranch?.id]);
 
   const fetchData = async () => {
     try {
       const [studentsRes, enrollmentsRes] = await Promise.all([
-        usersApi.getAll({ role: 'Student' }),
+        usersApi.getAll({ role: 'Student', branchId: selectedBranch?.id }),
         enrollmentsApi.getAll({ status: 'Active' }),
       ]);
       setStudents(studentsRes.data);

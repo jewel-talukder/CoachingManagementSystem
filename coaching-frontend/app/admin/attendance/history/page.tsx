@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import AdminLayout from '@/components/layouts/AdminLayout';
 import { attendanceApi, branchesApi } from '@/lib/api';
+import { useBranchStore } from '@/lib/store/branchStore';
 import {
     Calendar,
     Search,
@@ -17,21 +18,33 @@ import {
 
 export default function AttendanceHistoryPage() {
     const [history, setHistory] = useState<any[]>([]);
-    const [branches, setBranches] = useState<any[]>([]); // Added branches state
+    const [branches, setBranches] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
-    const [selectedBranchId, setSelectedBranchId] = useState<string>(''); // Added selectedBranchId state
+
+    // Global Branch Store
+    const { selectedBranch } = useBranchStore();
+    const [selectedBranchId, setSelectedBranchId] = useState<string>('');
 
     // Pagination State
     const [page, setPage] = useState(1);
     const [limit, setLimit] = useState(20);
     const [total, setTotal] = useState(0);
 
+    // Sync global branch change
     useEffect(() => {
-        fetchBranches(); // Fetch branches on mount
-        fetchHistory();
-    }, [page, limit]); // Re-fetch on page or limit change
+        if (selectedBranch) {
+            setSelectedBranchId(selectedBranch.id.toString());
+        }
+    }, [selectedBranch]);
+
+    useEffect(() => {
+        fetchBranches();
+        if (selectedBranchId || selectedBranch) {
+            fetchHistory();
+        }
+    }, [page, limit, selectedBranchId]); // Refetch when local state updates (which comes from global)
 
     const fetchBranches = async () => {
         try {
@@ -48,16 +61,17 @@ export default function AttendanceHistoryPage() {
             const params: any = { page, limit };
             if (startDate) params.startDate = startDate;
             if (endDate) params.endDate = endDate;
-            if (selectedBranchId) params.branchId = selectedBranchId; // Added branchId to params
+
+            // Prefer local state if set (which links to global), or fallback to global direct usage
+            const branchIdToUse = selectedBranchId || selectedBranch?.id;
+            if (branchIdToUse) params.branchId = branchIdToUse;
 
             const response = await attendanceApi.getTeacherHistory(params);
 
-            // Backend now returns wrapped object: { data: [], total: 0, ... }
             if (response.data && Array.isArray(response.data.data)) {
                 setHistory(response.data.data);
                 setTotal(response.data.total);
             } else {
-                // Fallback if backend hasn't updated immediately or something (safety)
                 setHistory(Array.isArray(response.data) ? response.data : []);
                 setTotal(Array.isArray(response.data) ? response.data.length : 0);
             }

@@ -6,6 +6,7 @@ import { teachersApi } from '@/lib/api';
 import { Plus, Search, Edit, Trash2, GraduationCap } from 'lucide-react';
 import Link from 'next/link';
 import { useToastStore } from '@/lib/store/toastStore';
+import { useBranchStore } from '@/lib/store/branchStore';
 
 export default function TeachersPage() {
   const [teachers, setTeachers] = useState<any[]>([]);
@@ -14,14 +15,16 @@ export default function TeachersPage() {
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const { addToast } = useToastStore();
 
+  const { selectedBranch } = useBranchStore();
+
   useEffect(() => {
     fetchTeachers();
-  }, []);
+  }, [selectedBranch?.id]);
 
   const fetchTeachers = async () => {
     try {
       setLoading(true);
-      const response = await teachersApi.getAll();
+      const response = await teachersApi.getAll({ branchId: selectedBranch?.id });
       setTeachers(response.data);
     } catch (error) {
       console.error('Failed to fetch teachers:', error);
@@ -167,11 +170,10 @@ export default function TeachersPage() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span
-                        className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                          teacher.isActive
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-gray-100 text-gray-800'
-                        }`}
+                        className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${teacher.isActive
+                          ? 'bg-green-100 text-green-800'
+                          : 'bg-gray-100 text-gray-800'
+                          }`}
                       >
                         {teacher.isActive ? 'Active' : 'Inactive'}
                       </span>
