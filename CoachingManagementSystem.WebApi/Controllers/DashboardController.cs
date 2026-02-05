@@ -80,7 +80,7 @@ public class DashboardController : ControllerBase
 
     [HttpGet("teacher")]
     [Authorize(Roles = "Teacher")]
-    public async Task<ActionResult> GetTeacherDashboard()
+    public async Task<ActionResult> GetTeacherDashboard([FromQuery] int? branchId)
     {
         var coachingId = GetCoachingId();
         var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
@@ -118,8 +118,17 @@ public class DashboardController : ControllerBase
             } : null
         };
 
-        var assignedBatches = await _context.Batches
-            .Where(b => b.CoachingId == coachingId.Value && b.TeacherId == teacher.Id && b.IsActive && !b.IsDeleted)
+        // Build query for assigned batches
+        var assignedBatchesQuery = _context.Batches
+            .Where(b => b.CoachingId == coachingId.Value && b.TeacherId == teacher.Id && b.IsActive && !b.IsDeleted);
+
+        // Filter by branch if provided
+        if (branchId.HasValue)
+        {
+            assignedBatchesQuery = assignedBatchesQuery.Where(b => b.BranchId == branchId.Value);
+        }
+
+        var assignedBatches = await assignedBatchesQuery
             .Select(b => new
             {
                 Id = b.Id,
@@ -143,9 +152,35 @@ public class DashboardController : ControllerBase
                        e.Status == "Active")
             .CountAsync();
 
+        // Get courses where teacher is directly assigned or teaches a subject
+        var courseIdsFromSubjects = await _context.Subjects
+            .Where(s => s.TeacherId == teacher.Id && s.CoachingId == coachingId.Value && !s.IsDeleted)
+            .Select(s => s.CourseId)
+            .ToListAsync();
+
+        var directCourseIds = await _context.Courses
+            .Where(c => c.TeacherId == teacher.Id && c.CoachingId == coachingId.Value && !c.IsDeleted)
+            .Select(c => c.Id)
+            .ToListAsync();
+
+        var allCourseIds = courseIdsFromSubjects.Concat(directCourseIds).Distinct().ToList();
+
+        var assignedCoursesQuery = _context.Courses
+            .Where(c => allCourseIds.Contains(c.Id) && c.CoachingId == coachingId.Value && !c.IsDeleted);
+
+        if (branchId.HasValue)
+        {
+            assignedCoursesQuery = assignedCoursesQuery.Where(c => c.BranchId == branchId.Value);
+        }
+
+        var assignedCourses = await assignedCoursesQuery
+            .Select(c => new { Id = c.Id, Name = c.Name })
+            .ToListAsync();
+
         return Ok(new
         {
             AssignedBatches = assignedBatches,
+            AssignedCourses = assignedCourses,
             TodayClasses = todayClasses,
             TotalStudents = totalStudents,
             Profile = new 

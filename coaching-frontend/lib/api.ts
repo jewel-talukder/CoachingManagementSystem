@@ -101,7 +101,7 @@ export const authApi = {
 // Dashboard API
 export const dashboardApi = {
   getCoachingAdmin: () => api.get('/dashboard/coaching-admin'),
-  getTeacher: () => api.get('/dashboard/teacher'),
+  getTeacher: (params?: { branchId?: number }) => api.get('/dashboard/teacher', { params }),
   getStudent: () => api.get('/dashboard/student'),
 };
 
@@ -148,9 +148,10 @@ export const enrollmentsApi = {
 
 // Attendance API
 export const attendanceApi = {
-  get: (params: { batchId: number; date?: string }) =>
+  get: (params: { batchId?: number; courseId?: number; date?: string }) =>
     api.get('/attendance', { params }),
-  mark: (data: any) => api.post('/attendance', data),
+  mark: (data: { batchId?: number; courseId?: number; date: string; attendanceItems: any[] }) =>
+    api.post('/attendance/mark', data),
   getStudent: (studentId: number, params?: { batchId?: number; startDate?: string; endDate?: string }) =>
     api.get(`/attendance/student/${studentId}`, { params }),
   submitSelf: (data: { date: string; status: string; remarks?: string }) =>

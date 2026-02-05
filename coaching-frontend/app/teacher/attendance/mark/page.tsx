@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { batchesApi, attendanceApi, dashboardApi } from '@/lib/api';
+import { useBranchStore } from '@/lib/store/branchStore';
 import { useToastStore } from '@/lib/store/toastStore';
 import {
     Users,
@@ -18,8 +19,11 @@ import {
 import { useRouter } from 'next/navigation';
 
 export default function MarkStudentAttendancePage() {
+    const [enrollmentType, setEnrollmentType] = useState<'course' | 'batch'>('batch');
     const [batches, setBatches] = useState<any[]>([]);
+    const [courses, setCourses] = useState<any[]>([]);
     const [selectedBatchId, setSelectedBatchId] = useState<number>(0);
+    const [selectedCourseId, setSelectedCourseId] = useState<number>(0);
     const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
     const [students, setStudents] = useState<any[]>([]);
     const [attendanceData, setAttendanceData] = useState<any>({}); // studentId -> { status, remarks }
@@ -28,30 +32,47 @@ export default function MarkStudentAttendancePage() {
 
     const { addToast } = useToastStore();
     const router = useRouter();
+    const { selectedBranch } = useBranchStore();
 
     useEffect(() => {
         fetchBatches();
-    }, []);
+    }, [selectedBranch?.id]);
 
     useEffect(() => {
-        if (selectedBatchId) {
+        if (enrollmentType === 'batch' && selectedBatchId) {
             fetchBatchStudentsAndAttendance();
+        } else if (enrollmentType === 'course' && selectedCourseId) {
+            fetchCourseStudentsAndAttendance();
         }
-    }, [selectedBatchId, date]);
+    }, [enrollmentType, selectedBatchId, selectedCourseId, date]);
 
     const fetchBatches = async () => {
         try {
-            // Fetch assigned batches for the teacher
-            const response = await dashboardApi.getTeacher();
-            if (response.data && response.data.assignedBatches) {
-                setBatches(response.data.assignedBatches);
-                if (response.data.assignedBatches.length > 0) {
+            // Fetch assigned batches and courses for the teacher, filtered by branch
+            const response = await dashboardApi.getTeacher({ branchId: selectedBranch?.id });
+            if (response.data) {
+                setBatches(response.data.assignedBatches || []);
+                setCourses(response.data.assignedCourses || []);
+
+                if (response.data.assignedBatches?.length > 0) {
                     setSelectedBatchId(response.data.assignedBatches[0].id);
+                } else {
+                    setSelectedBatchId(0);
+                }
+
+                if (response.data.assignedCourses?.length > 0) {
+                    setSelectedCourseId(response.data.assignedCourses[0].id);
+                } else {
+                    setSelectedCourseId(0);
+                }
+
+                if (!response.data.assignedBatches?.length && !response.data.assignedCourses?.length) {
+                    setStudents([]);
                 }
             }
         } catch (error) {
-            console.error('Failed to fetch batches', error);
-            addToast('Failed to load your batches', 'error');
+            console.error('Failed to fetch data', error);
+            addToast('Failed to load your data', 'error');
         } finally {
             setLoading(false);
         }
@@ -111,8 +132,47 @@ export default function MarkStudentAttendancePage() {
             setAttendanceData(initialData);
 
         } catch (error) {
-            console.error('Error fetching data', error);
+            console.error('Error fetching batch data', error);
             // addToast('Error loading student list', 'error');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const fetchCourseStudentsAndAttendance = async () => {
+        setLoading(true);
+        try {
+            // Get students enrolled in the course
+            const enrollmentsRes = await import('@/lib/api').then(m => m.enrollmentsApi.getAll({ courseId: selectedCourseId, status: 'Active' }));
+            const enrolledStudents = enrollmentsRes.data.map((e: any) => ({
+                id: e.studentId,
+                name: e.studentName || 'Student Name',
+                code: e.studentCode || 'N/A',
+                user: e.student?.user || {}
+            })).filter((v: any, i: any, a: any) => a.findIndex((t: any) => (t.id === v.id)) === i);
+
+            // Get existing attendance for the course and date
+            const attendanceRes = await attendanceApi.get({ courseId: selectedCourseId, date });
+
+            const existingMap: any = {};
+            attendanceRes.data.forEach((a: any) => {
+                existingMap[a.studentId] = { status: a.status, remarks: a.remarks || '' };
+            });
+
+            const initialData: any = {};
+            enrolledStudents.forEach((s: any) => {
+                if (existingMap[s.id]) {
+                    initialData[s.id] = existingMap[s.id];
+                } else {
+                    initialData[s.id] = { status: 'Present', remarks: '' };
+                }
+            });
+
+            setStudents(enrolledStudents);
+            setAttendanceData(initialData);
+
+        } catch (error) {
+            console.error('Error fetching course data', error);
         } finally {
             setLoading(false);
         }
@@ -152,7 +212,7 @@ export default function MarkStudentAttendancePage() {
             }));
 
             await attendanceApi.mark({
-                batchId: selectedBatchId,
+                ...(enrollmentType === 'batch' ? { batchId: selectedBatchId } : { courseId: selectedCourseId }),
                 date,
                 attendanceItems: items
             });
@@ -198,34 +258,78 @@ export default function MarkStudentAttendancePage() {
             <main className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
 
                 {/* Filters */}
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 mb-6 flex flex-col sm:flex-row gap-4 items-end">
-                    <div className="flex-1 w-full">
-                        <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Select Batch</label>
-                        <div className="relative">
-                            <select
-                                value={selectedBatchId}
-                                onChange={(e) => setSelectedBatchId(parseInt(e.target.value))}
-                                className="block w-full appearance-none bg-gray-50 border border-gray-200 text-gray-900 py-3 px-4 pr-8 rounded-lg focus:outline-none focus:bg-white focus:border-blue-500 font-medium"
-                            >
-                                {batches.map(b => (
-                                    <option key={b.id} value={b.id}>{b.name} ({b.courseName})</option>
-                                ))}
-                            </select>
-                            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
-                                <ChevronDown className="h-4 w-4" />
-                            </div>
+                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 mb-6">
+                    {/* Enrollment Type Selector */}
+                    <div className="mb-4">
+                        <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Enrollment Type</label>
+                        <div className="flex gap-6">
+                            <label className="flex items-center cursor-pointer">
+                                <input
+                                    type="radio"
+                                    value="batch"
+                                    checked={enrollmentType === 'batch'}
+                                    onChange={(e) => setEnrollmentType('batch')}
+                                    className="w-4 h-4 text-blue-600 focus:ring-blue-500"
+                                />
+                                <span className="ml-2 text-sm font-medium text-gray-700">Batch Wise</span>
+                            </label>
+                            <label className="flex items-center cursor-pointer">
+                                <input
+                                    type="radio"
+                                    value="course"
+                                    checked={enrollmentType === 'course'}
+                                    onChange={(e) => setEnrollmentType('course')}
+                                    className="w-4 h-4 text-blue-600 focus:ring-blue-500"
+                                />
+                                <span className="ml-2 text-sm font-medium text-gray-700">Course Wise</span>
+                            </label>
                         </div>
                     </div>
 
-                    <div className="flex-1 w-full">
-                        <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Date</label>
-                        <div className="relative">
-                            <input
-                                type="date"
-                                value={date}
-                                onChange={(e) => setDate(e.target.value)}
-                                className="block w-full bg-gray-50 border border-gray-200 text-gray-900 py-3 px-4 rounded-lg focus:outline-none focus:bg-white focus:border-blue-500 font-medium"
-                            />
+                    {/* Dropdowns */}
+                    <div className="flex flex-col sm:flex-row gap-4">
+                        <div className="flex-1 w-full">
+                            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
+                                {enrollmentType === 'batch' ? 'Select Batch' : 'Select Course'}
+                            </label>
+                            <div className="relative">
+                                {enrollmentType === 'batch' ? (
+                                    <select
+                                        value={selectedBatchId}
+                                        onChange={(e) => setSelectedBatchId(parseInt(e.target.value))}
+                                        className="block w-full appearance-none bg-gray-50 border border-gray-200 text-gray-900 py-3 px-4 pr-8 rounded-lg focus:outline-none focus:bg-white focus:border-blue-500 font-medium"
+                                    >
+                                        {batches.map(b => (
+                                            <option key={b.id} value={b.id}>{b.name}</option>
+                                        ))}
+                                    </select>
+                                ) : (
+                                    <select
+                                        value={selectedCourseId}
+                                        onChange={(e) => setSelectedCourseId(parseInt(e.target.value))}
+                                        className="block w-full appearance-none bg-gray-50 border border-gray-200 text-gray-900 py-3 px-4 pr-8 rounded-lg focus:outline-none focus:bg-white focus:border-blue-500 font-medium"
+                                    >
+                                        {courses.map(c => (
+                                            <option key={c.id} value={c.id}>{c.name}</option>
+                                        ))}
+                                    </select>
+                                )}
+                                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
+                                    <ChevronDown className="h-4 w-4" />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="flex-1 w-full">
+                            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Date</label>
+                            <div className="relative">
+                                <input
+                                    type="date"
+                                    value={date}
+                                    onChange={(e) => setDate(e.target.value)}
+                                    className="block w-full bg-gray-50 border border-gray-200 text-gray-900 py-3 px-4 rounded-lg focus:outline-none focus:bg-white focus:border-blue-500 font-medium"
+                                />
+                            </div>
                         </div>
                     </div>
                 </div>

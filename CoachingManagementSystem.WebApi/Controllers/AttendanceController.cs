@@ -21,17 +21,34 @@ public class AttendanceController : ControllerBase
 
     [HttpGet]
     [Authorize(Roles = "Teacher,Coaching Admin,Super Admin")]
-    public async Task<ActionResult> GetAttendance([FromQuery] int batchId, [FromQuery] DateTime? date)
+    public async Task<ActionResult> GetAttendance([FromQuery] int? batchId, [FromQuery] int? courseId, [FromQuery] DateTime? date)
     {
         var coachingId = GetCoachingId();
         if (coachingId == null)
             return Unauthorized();
 
+        if (!batchId.HasValue && !courseId.HasValue)
+            return BadRequest(new { message = "Either batchId or courseId must be provided" });
+
         var attendanceQuery = _context.Attendances
             .Include(a => a.Student)
                 .ThenInclude(s => s.User)
             .Include(a => a.Batch)
-            .Where(a => a.CoachingId == coachingId.Value && a.BatchId == batchId && !a.IsDeleted);
+            .Where(a => a.CoachingId == coachingId.Value && !a.IsDeleted);
+
+        if (batchId.HasValue)
+        {
+            attendanceQuery = attendanceQuery.Where(a => a.BatchId == batchId.Value);
+        }
+        else if (courseId.HasValue)
+        {
+            // Get attendance for students enrolled in this course where BatchId is null (course-level attendance)
+            var studentIds = await _context.Enrollments
+                .Where(e => e.CourseId == courseId.Value && e.Status == "Active")
+                .Select(e => e.StudentId)
+                .ToListAsync();
+            attendanceQuery = attendanceQuery.Where(a => studentIds.Contains(a.StudentId.Value) && a.BatchId == null);
+        }
 
         if (date.HasValue)
         {
@@ -58,7 +75,7 @@ public class AttendanceController : ControllerBase
         return Ok(attendance);
     }
 
-    [HttpPost]
+    [HttpPost("mark")]
     [Authorize(Roles = "Teacher,Coaching Admin,Super Admin")]
     public async Task<ActionResult> MarkAttendance([FromBody] MarkAttendanceRequest request)
     {
@@ -68,12 +85,34 @@ public class AttendanceController : ControllerBase
 
         var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
 
-        // Verify batch exists
-        var batch = await _context.Batches
-            .FirstOrDefaultAsync(b => b.Id == request.BatchId && b.CoachingId == coachingId.Value && !b.IsDeleted);
+        // Validate that either batchId or courseId is provided
+        if (!request.BatchId.HasValue && !request.CourseId.HasValue)
+            return BadRequest(new { message = "Either BatchId or CourseId must be provided" });
 
-        if (batch == null)
-            return NotFound(new { message = "Batch not found" });
+        // Determine the batchId to use for attendance records
+        int? attendanceBatchId = request.BatchId;
+        
+        if (request.BatchId.HasValue)
+        {
+            // Verify batch exists
+            var batch = await _context.Batches
+                .FirstOrDefaultAsync(b => b.Id == request.BatchId.Value && b.CoachingId == coachingId.Value && !b.IsDeleted);
+
+            if (batch == null)
+                return NotFound(new { message = "Batch not found" });
+        }
+        else if (request.CourseId.HasValue)
+        {
+            // Verify course exists
+            var course = await _context.Courses
+                .FirstOrDefaultAsync(c => c.Id == request.CourseId.Value && c.CoachingId == coachingId.Value && !c.IsDeleted);
+
+            if (course == null)
+                return NotFound(new { message = "Course not found" });
+            
+            // For course-wise attendance, we'll leave batchId as null
+            attendanceBatchId = null;
+        }
 
         var attendances = new List<Attendance>();
 
@@ -83,11 +122,17 @@ public class AttendanceController : ControllerBase
             foreach (var item in request.AttendanceItems)
             {
                 // Check if attendance already exists for this date
-                var existing = await _context.Attendances
-                    .FirstOrDefaultAsync(a => a.StudentId == item.StudentId 
-                        && a.BatchId == request.BatchId 
+                var existingQuery = _context.Attendances
+                    .Where(a => a.StudentId == item.StudentId 
                         && a.AttendanceDate.Date == request.Date.Date 
                         && !a.IsDeleted);
+
+                if (request.BatchId.HasValue)
+                    existingQuery = existingQuery.Where(a => a.BatchId == request.BatchId.Value);
+                else
+                    existingQuery = existingQuery.Where(a => a.BatchId == null);
+
+                var existing = await existingQuery.FirstOrDefaultAsync();
 
                 if (existing != null)
                 {
@@ -104,7 +149,7 @@ public class AttendanceController : ControllerBase
                     {
                         CoachingId = coachingId.Value,
                         StudentId = item.StudentId,
-                        BatchId = request.BatchId,
+                        BatchId = attendanceBatchId,
                         AttendanceDate = request.Date,
                         Status = item.Status,
                         Remarks = item.Remarks,
@@ -425,7 +470,8 @@ public class AttendanceController : ControllerBase
 
 public class MarkAttendanceRequest
 {
-    public int BatchId { get; set; }
+    public int? BatchId { get; set; }
+    public int? CourseId { get; set; }
     public DateTime Date { get; set; }
     public List<AttendanceItem> AttendanceItems { get; set; } = new();
 }
