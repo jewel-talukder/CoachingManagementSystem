@@ -141,6 +141,9 @@ public class DashboardController : ControllerBase
             })
             .ToListAsync();
 
+
+
+
         var today = DateTime.UtcNow.Date;
         var todayClasses = assignedBatches
             .Where(b => b.ScheduleDays != null && IsScheduledToday(b.ScheduleDays, today))
