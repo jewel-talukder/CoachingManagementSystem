@@ -118,43 +118,6 @@ public class DashboardController : ControllerBase
             } : null
         };
 
-        // Build query for assigned batches
-        var assignedBatchesQuery = _context.Batches
-            .Where(b => b.CoachingId == coachingId.Value && b.TeacherId == teacher.Id && b.IsActive && !b.IsDeleted);
-
-        // Filter by branch if provided
-        if (branchId.HasValue)
-        {
-            assignedBatchesQuery = assignedBatchesQuery.Where(b => b.BranchId == branchId.Value);
-        }
-
-        var assignedBatches = await assignedBatchesQuery
-            .Select(b => new
-            {
-                Id = b.Id,
-                Name = b.Name,
-                CurrentStudents = b.CurrentStudents,
-                MaxStudents = b.MaxStudents,
-                StartTime = b.StartTime,
-                EndTime = b.EndTime,
-                ScheduleDays = b.ScheduleDays
-            })
-            .ToListAsync();
-
-
-
-
-        var today = DateTime.UtcNow.Date;
-        var todayClasses = assignedBatches
-            .Where(b => b.ScheduleDays != null && IsScheduledToday(b.ScheduleDays, today))
-            .ToList();
-
-        var totalStudents = await _context.Enrollments
-            .Where(e => e.CoachingId == coachingId.Value && 
-                       assignedBatches.Select(ab => ab.Id).Contains(e.BatchId) && 
-                       e.Status == "Active")
-            .CountAsync();
-
         // Get courses where teacher is directly assigned or teaches a subject
         var courseIdsFromSubjects = await _context.Subjects
             .Where(s => s.TeacherId == teacher.Id && s.CoachingId == coachingId.Value && !s.IsDeleted)
@@ -179,6 +142,48 @@ public class DashboardController : ControllerBase
         var assignedCourses = await assignedCoursesQuery
             .Select(c => new { Id = c.Id, Name = c.Name })
             .ToListAsync();
+
+        // Get batches where teacher is primary
+        // OR batches that have active enrollments for any course the teacher teaches
+        var extraBatchIds = await _context.Enrollments
+            .Where(e => allCourseIds.Contains(e.CourseId) && e.Status == "Active" && e.CoachingId == coachingId.Value)
+            .Select(e => e.BatchId)
+            .Distinct()
+            .ToListAsync();
+
+        // Build query for assigned batches
+        var assignedBatchesQuery = _context.Batches
+            .Where(b => b.CoachingId == coachingId.Value && b.IsActive && !b.IsDeleted && 
+                       (b.TeacherId == teacher.Id || extraBatchIds.Contains(b.Id)));
+
+        // Filter by branch if provided
+        if (branchId.HasValue)
+        {
+            assignedBatchesQuery = assignedBatchesQuery.Where(b => b.BranchId == branchId.Value);
+        }
+        var assignedBatches = await assignedBatchesQuery
+            .Select(b => new
+            {
+                Id = b.Id,
+                Name = b.Name,
+                CurrentStudents = b.CurrentStudents,
+                MaxStudents = b.MaxStudents,
+                StartTime = b.StartTime,
+                EndTime = b.EndTime,
+                ScheduleDays = b.ScheduleDays
+            })
+            .ToListAsync();
+
+        var today = DateTime.UtcNow.Date;
+        var todayClasses = assignedBatches
+            .Where(b => b.ScheduleDays != null && IsScheduledToday(b.ScheduleDays, today))
+            .ToList();
+
+        var totalStudents = await _context.Enrollments
+            .Where(e => e.CoachingId == coachingId.Value && 
+                       assignedBatches.Select(ab => ab.Id).Contains(e.BatchId) && 
+                       e.Status == "Active")
+            .CountAsync();
 
         return Ok(new
         {
