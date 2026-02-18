@@ -5,7 +5,6 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useRouter } from 'next/navigation';
-import AdminLayout from '@/components/layouts/AdminLayout';
 import { enrollmentsApi, coursesApi, batchesApi, usersApi } from '@/lib/api';
 
 const enrollmentSchema = z.object({
@@ -107,137 +106,134 @@ export default function NewEnrollmentPage() {
   };
 
   return (
-    <AdminLayout>
-      <div className="px-4 py-6 sm:px-0">
-        <h1 className="text-3xl font-bold text-gray-900 mb-6">Create New Enrollment</h1>
+    <div className="px-4 py-6 sm:px-0">
+      <h1 className="text-3xl font-bold text-gray-900 mb-6">Create New Enrollment</h1>
 
-        {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4">
-            {error}
-          </div>
-        )}
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4">
+          {error}
+        </div>
+      )}
 
-        <form onSubmit={handleSubmit(onSubmit)} className="bg-white shadow rounded-lg p-6">
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-            <div>
-              <label htmlFor="studentId" className="block text-sm font-medium text-gray-700">
-                Student *
-              </label>
-              <select
-                {...register('studentId', { valueAsNumber: true })}
-                id="studentId"
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-3 py-2 border"
-              >
-                <option value="">Select a student</option>
-                {students.map((student) => (
-                  <option key={student.id} value={student.studentId || student.id}>
-                    {student.firstName} {student.lastName} {student.studentCode ? `(${student.studentCode})` : ''} - {student.phone}
-                  </option>
-                ))}
-              </select>
-              {errors.studentId && (
-                <p className="mt-1 text-sm text-red-600">{errors.studentId.message}</p>
-              )}
-            </div>
-
-            <div>
-              <label htmlFor="courseId" className="block text-sm font-medium text-gray-700">
-                Course *
-              </label>
-              <select
-                {...register('courseId', { valueAsNumber: true })}
-                id="courseId"
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-3 py-2 border"
-              >
-                <option value="">Select a course</option>
-                {courses.map((course) => (
-                  <option key={course.id} value={course.id}>
-                    {course.name} - ₹{course.fee || 0}
-                  </option>
-                ))}
-              </select>
-              {errors.courseId && (
-                <p className="mt-1 text-sm text-red-600">{errors.courseId.message}</p>
-              )}
-            </div>
-
-            <div>
-              <label htmlFor="batchId" className="block text-sm font-medium text-gray-700">
-                Batch *
-              </label>
-              <select
-                {...register('batchId', { valueAsNumber: true })}
-                id="batchId"
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-3 py-2 border"
-              >
-                <option value="">Select a batch</option>
-                {batches.map((batch) => (
-                  <option key={batch.id} value={batch.id}>
-                    {batch.name} ({batch.currentStudents}/{batch.maxStudents} students)
-                    {batch.monthlyFee ? ` - ${batch.monthlyFee} Taka/month` : ''}
-                  </option>
-                ))}
-              </select>
-              {errors.batchId && (
-                <p className="mt-1 text-sm text-red-600">{errors.batchId.message}</p>
-              )}
-            </div>
-
-            <div>
-              <label htmlFor="totalFee" className="block text-sm font-medium text-gray-700">
-                Total Fee (Taka) {batchId && courseId && (
-                  <span className="text-xs text-gray-500">(Auto-calculated, can be changed)</span>
-                )}
-              </label>
-              <input
-                {...register('totalFee', { valueAsNumber: true })}
-                type="number"
-                id="totalFee"
-                step="0.01"
-                min="0"
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-3 py-2 border"
-              />
-              {batchId && courseId && (
-                <p className="mt-1 text-xs text-gray-500">
-                  Auto-calculated as: Batch Monthly Fee × Course Duration. You can modify if needed.
-                </p>
-              )}
-            </div>
-
-            <div>
-              <label htmlFor="feePaid" className="block text-sm font-medium text-gray-700">
-                Fee Paid (₹)
-              </label>
-              <input
-                {...register('feePaid', { valueAsNumber: true })}
-                type="number"
-                id="feePaid"
-                step="0.01"
-                min="0"
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-3 py-2 border"
-              />
-            </div>
-          </div>
-
-          <div className="mt-6 flex justify-end space-x-3">
-            <button
-              type="button"
-              onClick={() => router.back()}
-              className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+      <form onSubmit={handleSubmit(onSubmit)} className="bg-white shadow rounded-lg p-6">
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+          <div>
+            <label htmlFor="studentId" className="block text-sm font-medium text-gray-700">
+              Student *
+            </label>
+            <select
+              {...register('studentId', { valueAsNumber: true })}
+              id="studentId"
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-3 py-2 border"
             >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={loading}
-              className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
-            >
-              {loading ? 'Creating...' : 'Create Enrollment'}
-            </button>
+              <option value="">Select a student</option>
+              {students.map((student) => (
+                <option key={student.id} value={student.studentId || student.id}>
+                  {student.firstName} {student.lastName} {student.studentCode ? `(${student.studentCode})` : ''} - {student.phone}
+                </option>
+              ))}
+            </select>
+            {errors.studentId && (
+              <p className="mt-1 text-sm text-red-600">{errors.studentId.message}</p>
+            )}
           </div>
-        </form>
-      </div>
-    </AdminLayout>
+
+          <div>
+            <label htmlFor="courseId" className="block text-sm font-medium text-gray-700">
+              Course *
+            </label>
+            <select
+              {...register('courseId', { valueAsNumber: true })}
+              id="courseId"
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-3 py-2 border"
+            >
+              <option value="">Select a course</option>
+              {courses.map((course) => (
+                <option key={course.id} value={course.id}>
+                  {course.name} - ₹{course.fee || 0}
+                </option>
+              ))}
+            </select>
+            {errors.courseId && (
+              <p className="mt-1 text-sm text-red-600">{errors.courseId.message}</p>
+            )}
+          </div>
+
+          <div>
+            <label htmlFor="batchId" className="block text-sm font-medium text-gray-700">
+              Batch *
+            </label>
+            <select
+              {...register('batchId', { valueAsNumber: true })}
+              id="batchId"
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-3 py-2 border"
+            >
+              <option value="">Select a batch</option>
+              {batches.map((batch) => (
+                <option key={batch.id} value={batch.id}>
+                  {batch.name} ({batch.currentStudents}/{batch.maxStudents} students)
+                  {batch.monthlyFee ? ` - ${batch.monthlyFee} Taka/month` : ''}
+                </option>
+              ))}
+            </select>
+            {errors.batchId && (
+              <p className="mt-1 text-sm text-red-600">{errors.batchId.message}</p>
+            )}
+          </div>
+
+          <div>
+            <label htmlFor="totalFee" className="block text-sm font-medium text-gray-700">
+              Total Fee (Taka) {batchId && courseId && (
+                <span className="text-xs text-gray-500">(Auto-calculated, can be changed)</span>
+              )}
+            </label>
+            <input
+              {...register('totalFee', { valueAsNumber: true })}
+              type="number"
+              id="totalFee"
+              step="0.01"
+              min="0"
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-3 py-2 border"
+            />
+            {batchId && courseId && (
+              <p className="mt-1 text-xs text-gray-500">
+                Auto-calculated as: Batch Monthly Fee × Course Duration. You can modify if needed.
+              </p>
+            )}
+          </div>
+
+          <div>
+            <label htmlFor="feePaid" className="block text-sm font-medium text-gray-700">
+              Fee Paid (₹)
+            </label>
+            <input
+              {...register('feePaid', { valueAsNumber: true })}
+              type="number"
+              id="feePaid"
+              step="0.01"
+              min="0"
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-3 py-2 border"
+            />
+          </div>
+        </div>
+
+        <div className="mt-6 flex justify-end space-x-3">
+          <button
+            type="button"
+            onClick={() => router.back()}
+            className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={loading}
+            className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
+          >
+            {loading ? 'Creating...' : 'Create Enrollment'}
+          </button>
+        </div>
+      </form>
+    </div>
   );
 }
-

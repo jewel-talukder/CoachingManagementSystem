@@ -1,9 +1,11 @@
 'use client';
 
 import { useAuthStore } from '@/lib/store/authStore';
-import { useRouter } from 'next/navigation';
-import { useEffect, useState, Suspense, lazy } from 'react';
-import { LayoutDashboard, Users, BookOpen, UsersRound, Settings, DollarSign, GraduationCap, Crown, Award, BookMarked, Building2, Calendar, CheckCircle, Timer, History } from 'lucide-react';
+import { useRouter, usePathname } from 'next/navigation';
+import { useEffect, useState, Suspense, lazy, useMemo } from 'react';
+import { LayoutDashboard, Users, BookOpen, UsersRound, Settings, DollarSign, GraduationCap, Crown, Award, BookMarked, Building2, Calendar, CheckCircle, Timer, History, ShieldCheck } from 'lucide-react';
+
+import { MenuItem } from './admin/AdminSidebar';
 
 // Lazy load components
 const AdminSidebar = lazy(() => import('./admin/AdminSidebar'));
@@ -14,9 +16,12 @@ interface AdminLayoutProps {
   children: React.ReactNode;
 }
 
+const ALLOWED_ROLES = ['Coaching Admin', 'Super Admin', 'Manager', 'Receptionist'];
+
 export default function AdminLayout({ children }: AdminLayoutProps) {
-  const { user, isAuthenticated, hasRole } = useAuthStore();
+  const { user, isAuthenticated } = useAuthStore();
   const router = useRouter();
+  const pathname = usePathname();
   const [mounted, setMounted] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
@@ -29,11 +34,199 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     setMounted(true);
   }, []);
 
-  useEffect(() => {
-    if (mounted && (!isAuthenticated || !user || (!user.roles.includes('Coaching Admin') && !user.roles.includes('Super Admin')))) {
-      router.push('/login');
+  // Helper to find item by path in recursive menu
+  const findMenuItemByPath = (items: MenuItem[], path: string): MenuItem | null => {
+    for (const item of items) {
+      if (item.href === path) return item;
+      if (item.children) {
+        const found = findMenuItemByPath(item.children, path);
+        if (found) return found;
+      }
     }
-  }, [mounted, isAuthenticated, user, router]);
+    return null;
+  };
+
+  useEffect(() => {
+    if (mounted) {
+      if (!isAuthenticated || !user || !user.roles.some(role => ALLOWED_ROLES.includes(role))) {
+        router.push('/login');
+        return;
+      }
+
+      // Check if current page is allowed for user role
+      // We check if the item is in the menu AND if the user has a required role for it
+      // Exceptions for dynamic routes or sub-routes can be added if needed
+      const currentMenuItem = findMenuItemByPath(menuItems, pathname);
+      if (currentMenuItem && currentMenuItem.roles) {
+        const hasAccess = currentMenuItem.roles.some(role => user.roles.includes(role));
+        if (!hasAccess) {
+          router.push('/admin/dashboard'); // Redirect to dashboard if no access
+        }
+      }
+    }
+  }, [mounted, isAuthenticated, user, router, pathname]);
+
+  const menuItems: MenuItem[] = [
+    {
+      href: '/admin/dashboard',
+      label: 'Dashboard',
+      icon: LayoutDashboard,
+      roles: ['Coaching Admin', 'Super Admin', 'Manager', 'Receptionist'],
+    },
+    {
+      label: 'Academic',
+      icon: BookOpen,
+      roles: ['Coaching Admin', 'Super Admin', 'Manager'],
+      children: [
+        {
+          href: '/admin/branches',
+          label: 'Branches',
+          icon: Building2,
+          roles: ['Coaching Admin', 'Super Admin', 'Manager'],
+        },
+        {
+          href: '/admin/courses',
+          label: 'Courses',
+          icon: BookOpen,
+          roles: ['Coaching Admin', 'Super Admin', 'Manager'],
+        },
+        {
+          href: '/admin/batches',
+          label: 'Batches',
+          icon: UsersRound,
+          roles: ['Coaching Admin', 'Super Admin', 'Manager'],
+        },
+        {
+          href: '/admin/shifts',
+          label: 'Shifts',
+          icon: Timer,
+          roles: ['Coaching Admin', 'Super Admin', 'Manager'],
+        },
+        {
+          href: '/admin/holidays',
+          label: 'Holidays',
+          icon: Calendar,
+          roles: ['Coaching Admin', 'Super Admin', 'Manager'],
+        },
+      ],
+    },
+    {
+      label: 'People',
+      icon: Users,
+      roles: ['Coaching Admin', 'Super Admin', 'Manager', 'Receptionist'],
+      children: [
+        {
+          href: '/admin/students',
+          label: 'Students',
+          icon: Users,
+          roles: ['Coaching Admin', 'Super Admin', 'Manager', 'Receptionist'],
+        },
+        {
+          href: '/admin/teachers',
+          label: 'Teachers',
+          icon: GraduationCap,
+          roles: ['Coaching Admin', 'Super Admin', 'Manager'],
+        },
+        {
+          href: '/admin/users',
+          label: 'Users',
+          icon: Users,
+          roles: ['Coaching Admin', 'Super Admin'],
+        },
+      ],
+    },
+    {
+      label: 'Setup',
+      icon: Settings,
+      roles: ['Coaching Admin', 'Super Admin', 'Manager'],
+      children: [
+        {
+          href: '/admin/qualifications',
+          label: 'Qualifications',
+          icon: Award,
+          roles: ['Coaching Admin', 'Super Admin', 'Manager'],
+        },
+        {
+          href: '/admin/specializations',
+          label: 'Specializations',
+          icon: BookMarked,
+          roles: ['Coaching Admin', 'Super Admin', 'Manager'],
+        },
+      ],
+    },
+    {
+      label: 'Attendance',
+      icon: CheckCircle,
+      roles: ['Coaching Admin', 'Super Admin', 'Manager', 'Receptionist'],
+      children: [
+        {
+          href: '/admin/attendance/approve',
+          label: 'Approvals',
+          icon: CheckCircle,
+          roles: ['Coaching Admin', 'Super Admin', 'Manager'],
+        },
+        {
+          href: '/admin/attendance/history',
+          label: 'History',
+          icon: History,
+          roles: ['Coaching Admin', 'Super Admin', 'Manager', 'Receptionist'],
+        },
+      ],
+    },
+    {
+      label: 'Finance',
+      icon: DollarSign,
+      roles: ['Coaching Admin', 'Super Admin', 'Manager', 'Receptionist'],
+      children: [
+        {
+          href: '/admin/payments',
+          label: 'Payment Due',
+          icon: DollarSign,
+          roles: ['Coaching Admin', 'Super Admin', 'Manager', 'Receptionist'],
+        },
+        {
+          href: '/admin/subscription',
+          label: 'Subscription',
+          icon: Crown,
+          roles: ['Coaching Admin', 'Super Admin'],
+        },
+      ],
+    },
+    {
+      href: '/admin/permissions',
+      label: 'Permissions',
+      icon: ShieldCheck,
+      roles: ['Coaching Admin', 'Super Admin'],
+    },
+    {
+      href: '/admin/settings',
+      label: 'Settings',
+      icon: Settings,
+      roles: ['Coaching Admin', 'Super Admin'],
+    },
+  ];
+
+  // Filter menu items based on user roles
+  const filteredMenuItems = useMemo(() => {
+    if (!user) return [];
+
+    const hasAccess = (item: MenuItem) => {
+      if (!item.roles) return true; // Default to public if no roles defined
+      return item.roles.some(role => user.roles.includes(role));
+    };
+
+    const filterItems = (items: MenuItem[]): MenuItem[] => {
+      return items
+        .filter(item => hasAccess(item))
+        .map(item => ({
+          ...item,
+          children: item.children ? filterItems(item.children) : undefined,
+        }))
+        .filter(item => !item.children || item.children.length > 0 || item.href);
+    };
+
+    return filterItems(menuItems);
+  }, [user, menuItems]);
 
   // Show loading state during hydration
   if (!mounted) {
@@ -44,92 +237,9 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     );
   }
 
-  if (!isAuthenticated || !user || (!user.roles.includes('Coaching Admin') && !user.roles.includes('Super Admin'))) {
+  if (!isAuthenticated || !user || !user.roles.some(role => ALLOWED_ROLES.includes(role))) {
     return null;
   }
-
-  const menuItems = [
-    {
-      href: '/admin/dashboard',
-      label: 'Dashboard',
-      icon: LayoutDashboard,
-    },
-    {
-      href: '/admin/branches',
-      label: 'Branches',
-      icon: Building2,
-    },
-    {
-      href: '/admin/students',
-      label: 'Students',
-      icon: Users,
-    },
-    {
-      href: '/admin/teachers',
-      label: 'Teachers',
-      icon: GraduationCap,
-    },
-    {
-      href: '/admin/qualifications',
-      label: 'Qualifications',
-      icon: Award,
-    },
-    {
-      href: '/admin/specializations',
-      label: 'Specializations',
-      icon: BookMarked,
-    },
-    {
-      href: '/admin/users',
-      label: 'Users',
-      icon: Users,
-    },
-    {
-      href: '/admin/courses',
-      label: 'Courses',
-      icon: BookOpen,
-    },
-    {
-      href: '/admin/batches',
-      label: 'Batches',
-      icon: UsersRound,
-    },
-    {
-      href: '/admin/shifts',
-      label: 'Shifts',
-      icon: Timer,
-    },
-    {
-      href: '/admin/holidays',
-      label: 'Holidays',
-      icon: Calendar,
-    },
-    {
-      href: '/admin/payments',
-      label: 'Payment Due',
-      icon: DollarSign,
-    },
-    {
-      href: '/admin/attendance/approve',
-      label: 'Approvals',
-      icon: CheckCircle,
-    },
-    {
-      href: '/admin/attendance/history',
-      label: 'History',
-      icon: History,
-    },
-    {
-      href: '/admin/subscription',
-      label: 'Subscription',
-      icon: Crown,
-    },
-    {
-      href: '/admin/settings',
-      label: 'Settings',
-      icon: Settings,
-    },
-  ];
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
@@ -143,7 +253,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
           </aside>
         }
       >
-        <AdminSidebar menuItems={menuItems} onSidebarToggle={handleSidebarToggle} />
+        <AdminSidebar menuItems={filteredMenuItems} onSidebarToggle={handleSidebarToggle} />
       </Suspense>
 
       {/* Main Content Area */}
@@ -156,7 +266,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
             </header>
           }
         >
-          <AdminHeader menuItems={menuItems} />
+          <AdminHeader menuItems={filteredMenuItems} />
         </Suspense>
 
         {/* Main Content */}
@@ -176,4 +286,3 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     </div>
   );
 }
-

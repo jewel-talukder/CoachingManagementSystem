@@ -9,8 +9,10 @@ import { branchesApi } from '@/lib/api';
 import { useRouter } from 'next/navigation';
 import { User, ChevronDown, Settings, LogOut, Building2 } from 'lucide-react';
 
+import { MenuItem } from './AdminSidebar';
+
 interface AdminHeaderProps {
-  menuItems: Array<{ href: string; label: string }>;
+  menuItems: MenuItem[];
 }
 
 export default function AdminHeader({ menuItems }: AdminHeaderProps) {
@@ -46,7 +48,7 @@ export default function AdminHeader({ menuItems }: AdminHeaderProps) {
 
       // Listen for custom event when branches are modified
       window.addEventListener('branches-updated', handleBranchUpdate);
-      
+
       // Also refresh when window regains focus (user might have added branch in another tab)
       const handleFocus = () => {
         if (user) {
@@ -92,11 +94,24 @@ export default function AdminHeader({ menuItems }: AdminHeaderProps) {
     return pathname === href;
   };
 
+  const getActiveLabel = (items: MenuItem[]): string | undefined => {
+    for (const item of items) {
+      if (item.href && isActive(item.href)) {
+        return item.label;
+      }
+      if (item.children) {
+        const childLabel = getActiveLabel(item.children);
+        if (childLabel) return childLabel;
+      }
+    }
+    return undefined;
+  };
+
   return (
     <header className="bg-white shadow-sm border-b border-gray-200 h-16 flex items-center justify-between px-6 sticky top-0 z-20">
       <div className="flex items-center">
         <h2 className="text-xl font-semibold text-gray-800">
-          {menuItems.find((item) => isActive(item.href))?.label || 'Admin Panel'}
+          {getActiveLabel(menuItems) || 'Admin Panel'}
         </h2>
       </div>
 
@@ -132,9 +147,8 @@ export default function AdminHeader({ menuItems }: AdminHeaderProps) {
                       <button
                         key={branch.id}
                         onClick={() => handleBranchChange(branch)}
-                        className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-50 flex items-center justify-between ${
-                          selectedBranch?.id === branch.id ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
-                        }`}
+                        className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-50 flex items-center justify-between ${selectedBranch?.id === branch.id ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
+                          }`}
                       >
                         <div>
                           <p className="font-medium">{branch.name}</p>
