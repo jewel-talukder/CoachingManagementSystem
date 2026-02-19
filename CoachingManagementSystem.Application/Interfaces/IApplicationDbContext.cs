@@ -10,6 +10,8 @@ public interface IApplicationDbContext
     DbSet<Branch> Branches { get; }
     DbSet<User> Users { get; }
     DbSet<Role> Roles { get; }
+    DbSet<Permission> Permissions { get; }
+    DbSet<RolePermission> RolePermissions { get; }
     DbSet<UserRole> UserRoles { get; }
     DbSet<Student> Students { get; }
     DbSet<Teacher> Teachers { get; }

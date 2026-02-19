@@ -28,6 +28,8 @@ public class AuthService : IAuthService
         var user = await _context.Users
             .Include(u => u.UserRoles)
                 .ThenInclude(ur => ur.Role)
+                    .ThenInclude(r => r.RolePermissions)
+                        .ThenInclude(rp => rp.Permission)
             .Include(u => u.Coaching)
             .FirstOrDefaultAsync(u => 
                 (u.Email == loginIdentifier || u.Phone == loginIdentifier) && !u.IsDeleted);
@@ -52,6 +54,13 @@ public class AuthService : IAuthService
         await _context.SaveChangesAsync();
 
         var roles = user.UserRoles.Select(ur => ur.Role.Name).ToList();
+        var permissions = user.UserRoles
+            .SelectMany(ur => ur.Role.RolePermissions)
+            .Where(rp => !rp.IsDeleted && !rp.Permission.IsDeleted)
+            .Select(rp => rp.Permission.Name)
+            .Distinct()
+            .ToList();
+
         var token = _jwtService.GenerateToken(user, roles, user.CoachingId);
         var refreshToken = _jwtService.GenerateRefreshToken();
 
@@ -65,9 +74,10 @@ public class AuthService : IAuthService
                 CoachingId = user.CoachingId,
                 FirstName = user.FirstName,
                 LastName = user.LastName,
-                Email = user.Email,
+                Email = user.Email ?? string.Empty,
                 Phone = user.Phone,
-                Roles = roles
+                Roles = roles,
+                Permissions = permissions
             },
             ExpiresAt = DateTime.UtcNow.AddHours(24)
         };

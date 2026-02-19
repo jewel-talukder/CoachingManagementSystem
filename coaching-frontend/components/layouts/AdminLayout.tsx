@@ -54,12 +54,11 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       }
 
       // Check if current page is allowed for user role
-      // We check if the item is in the menu AND if the user has a required role for it
-      // Exceptions for dynamic routes or sub-routes can be added if needed
+      // We check if the item is in the menu AND if the user has a required permission
       const currentMenuItem = findMenuItemByPath(menuItems, pathname);
-      if (currentMenuItem && currentMenuItem.roles) {
-        const hasAccess = currentMenuItem.roles.some(role => user.roles.includes(role));
-        if (!hasAccess) {
+      if (currentMenuItem && currentMenuItem.permission) {
+        const isAdmin = user.roles.includes('Super Admin') || user.roles.includes('Coaching Admin');
+        if (!isAdmin && !user.permissions.includes(currentMenuItem.permission)) {
           router.push('/admin/dashboard'); // Redirect to dashboard if no access
         }
       }
@@ -71,148 +70,153 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       href: '/admin/dashboard',
       label: 'Dashboard',
       icon: LayoutDashboard,
-      roles: ['Coaching Admin', 'Super Admin', 'Manager', 'Receptionist'],
+      permission: 'Dashboard.View',
     },
     {
       label: 'Academic',
       icon: BookOpen,
-      roles: ['Coaching Admin', 'Super Admin', 'Manager'],
+      permission: 'Academic.View',
       children: [
         {
           href: '/admin/branches',
           label: 'Branches',
           icon: Building2,
-          roles: ['Coaching Admin', 'Super Admin', 'Manager'],
+          permission: 'Academic.Branches.View',
         },
         {
           href: '/admin/courses',
           label: 'Courses',
           icon: BookOpen,
-          roles: ['Coaching Admin', 'Super Admin', 'Manager'],
+          permission: 'Academic.Courses.View',
         },
         {
           href: '/admin/batches',
           label: 'Batches',
           icon: UsersRound,
-          roles: ['Coaching Admin', 'Super Admin', 'Manager'],
+          permission: 'Academic.Batches.View',
         },
         {
           href: '/admin/shifts',
           label: 'Shifts',
           icon: Timer,
-          roles: ['Coaching Admin', 'Super Admin', 'Manager'],
+          permission: 'Academic.Shifts.View',
         },
         {
           href: '/admin/holidays',
           label: 'Holidays',
           icon: Calendar,
-          roles: ['Coaching Admin', 'Super Admin', 'Manager'],
+          permission: 'Academic.Holidays.View',
         },
       ],
     },
     {
       label: 'People',
       icon: Users,
-      roles: ['Coaching Admin', 'Super Admin', 'Manager', 'Receptionist'],
+      permission: 'People.View',
       children: [
         {
           href: '/admin/students',
           label: 'Students',
           icon: Users,
-          roles: ['Coaching Admin', 'Super Admin', 'Manager', 'Receptionist'],
+          permission: 'People.Students.View',
         },
         {
           href: '/admin/teachers',
           label: 'Teachers',
           icon: GraduationCap,
-          roles: ['Coaching Admin', 'Super Admin', 'Manager'],
+          permission: 'People.Teachers.View',
         },
         {
           href: '/admin/users',
           label: 'Users',
           icon: Users,
-          roles: ['Coaching Admin', 'Super Admin'],
+          permission: 'People.Users.View',
         },
       ],
     },
     {
       label: 'Setup',
       icon: Settings,
-      roles: ['Coaching Admin', 'Super Admin', 'Manager'],
+      permission: 'Setup.View',
       children: [
         {
           href: '/admin/qualifications',
           label: 'Qualifications',
           icon: Award,
-          roles: ['Coaching Admin', 'Super Admin', 'Manager'],
+          permission: 'Setup.Qualifications.View',
         },
         {
           href: '/admin/specializations',
           label: 'Specializations',
           icon: BookMarked,
-          roles: ['Coaching Admin', 'Super Admin', 'Manager'],
+          permission: 'Setup.Specializations.View',
         },
       ],
     },
     {
       label: 'Attendance',
       icon: CheckCircle,
-      roles: ['Coaching Admin', 'Super Admin', 'Manager', 'Receptionist'],
+      permission: 'Attendance.View',
       children: [
         {
           href: '/admin/attendance/approve',
           label: 'Approvals',
           icon: CheckCircle,
-          roles: ['Coaching Admin', 'Super Admin', 'Manager'],
+          permission: 'Attendance.Approve',
         },
         {
           href: '/admin/attendance/history',
           label: 'History',
           icon: History,
-          roles: ['Coaching Admin', 'Super Admin', 'Manager', 'Receptionist'],
+          permission: 'Attendance.View',
         },
       ],
     },
     {
       label: 'Finance',
       icon: DollarSign,
-      roles: ['Coaching Admin', 'Super Admin', 'Manager', 'Receptionist'],
+      permission: 'Finance.View',
       children: [
         {
           href: '/admin/payments',
           label: 'Payment Due',
           icon: DollarSign,
-          roles: ['Coaching Admin', 'Super Admin', 'Manager', 'Receptionist'],
+          permission: 'Finance.Payments.View',
         },
         {
           href: '/admin/subscription',
           label: 'Subscription',
           icon: Crown,
-          roles: ['Coaching Admin', 'Super Admin'],
+          permission: 'Finance.Subscription.View',
         },
       ],
     },
     {
-      href: '/admin/permissions',
-      label: 'Permissions',
+      href: '/admin/roles',
+      label: 'Roles & Permissions',
       icon: ShieldCheck,
-      roles: ['Coaching Admin', 'Super Admin'],
+      permission: 'People.Users.View', // Or dedicated permission
     },
     {
       href: '/admin/settings',
       label: 'Settings',
       icon: Settings,
-      roles: ['Coaching Admin', 'Super Admin'],
+      permission: 'Settings.View',
     },
   ];
 
-  // Filter menu items based on user roles
+  // Filter menu items based on user permissions
   const filteredMenuItems = useMemo(() => {
     if (!user) return [];
 
     const hasAccess = (item: MenuItem) => {
-      if (!item.roles) return true; // Default to public if no roles defined
-      return item.roles.some(role => user.roles.includes(role));
+      if (!item.permission) return true; // Default to public if no permission defined
+
+      // Admins (Super and Coaching) always have access for now, 
+      // but dynamic system is better
+      if (user.roles.includes('Super Admin') || user.roles.includes('Coaching Admin')) return true;
+
+      return user.permissions.includes(item.permission);
     };
 
     const filterItems = (items: MenuItem[]): MenuItem[] => {

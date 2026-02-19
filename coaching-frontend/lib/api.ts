@@ -257,4 +257,14 @@ export const superAdminApi = {
   blockCoaching: (id: number) => api.put(`/superadmin/coachings/${id}/block`),
   assignPlan: (id: number, data: any) => api.put(`/superadmin/coachings/${id}/assign-plan`, data),
 };
+// Roles API
+export const rolesApi = {
+  getAll: () => api.get('/roles'),
+  create: (data: { name: string; description?: string; permissionIds: number[] }) =>
+    api.post('/roles', data),
+  updatePermissions: (id: number, permissionIds: number[]) =>
+    api.put(`/roles/${id}/permissions`, { permissionIds }),
+  getAllPermissions: () => api.get('/roles/permissions'),
+  delete: (id: number) => api.delete(`/roles/${id}`),
+};
 

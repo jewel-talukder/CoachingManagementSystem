@@ -9,7 +9,7 @@ export interface MenuItem {
   href?: string;
   label: string;
   icon: any;
-  roles?: string[];
+  permission?: string;
   children?: MenuItem[];
 }
 

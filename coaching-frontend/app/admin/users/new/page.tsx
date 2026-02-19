@@ -1,12 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useRouter } from 'next/navigation';
-import { usersApi } from '@/lib/api';
-import { api } from '@/lib/api';
+import { usersApi, rolesApi } from '@/lib/api';
+import { useToastStore } from '@/lib/store/toastStore';
 
 const userSchema = z.object({
   firstName: z.string().min(2, 'First name is required'),
@@ -23,6 +23,21 @@ export default function NewUserPage() {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [roles, setRoles] = useState<{ id: number; name: string }[]>([]);
+  const { addToast } = useToastStore();
+
+  useEffect(() => {
+    const fetchRoles = async () => {
+      try {
+        const response = await rolesApi.getAll();
+        setRoles(response.data);
+      } catch (err) {
+        console.error('Failed to fetch roles', err);
+        addToast('Failed to load roles', 'error');
+      }
+    };
+    fetchRoles();
+  }, []);
 
   const {
     register,
@@ -43,7 +58,11 @@ export default function NewUserPage() {
     try {
       setLoading(true);
       setError(null);
-      await usersApi.create(data);
+      await usersApi.create({
+        ...data,
+        userType: 'Admin' // Default for this page
+      });
+      addToast('User created successfully', 'success');
       router.push('/admin/users');
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to create user');
@@ -51,13 +70,6 @@ export default function NewUserPage() {
       setLoading(false);
     }
   };
-
-  const roles = [
-    { id: 1, name: 'Admin' },
-    { id: 2, name: 'Staff' },
-    { id: 3, name: 'Teacher' },
-    { id: 4, name: 'Student' },
-  ];
 
   const handleRoleToggle = (roleId: number) => {
     const currentRoles = [...selectedRoles];
@@ -149,8 +161,8 @@ export default function NewUserPage() {
                 type="button"
                 onClick={() => handleRoleToggle(role.id)}
                 className={`px-4 py-2 rounded-full text-sm font-medium border ${selectedRoles.includes(role.id)
-                    ? 'bg-blue-600 text-white border-blue-600'
-                    : 'bg-white text-gray-700 border-gray-300 hover:border-blue-500'
+                  ? 'bg-blue-600 text-white border-blue-600'
+                  : 'bg-white text-gray-700 border-gray-300 hover:border-blue-500'
                   }`}
               >
                 {role.name}

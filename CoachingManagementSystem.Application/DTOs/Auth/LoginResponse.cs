@@ -18,6 +18,7 @@ public class UserDto
     public string Email { get; set; } = string.Empty;
     public string? Phone { get; set; }
     public List<string> Roles { get; set; } = new();
+    public List<string> Permissions { get; set; } = new();
 }
 
 public class PlanDto

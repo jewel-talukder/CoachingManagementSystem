@@ -201,7 +201,7 @@ export default function AdminHeader({ menuItems }: AdminHeaderProps) {
                     {user?.firstName} {user?.lastName}
                   </p>
                   <p className="text-xs text-gray-500 mt-1">{user?.email}</p>
-                  <p className="text-xs text-blue-600 mt-1 font-medium">Coaching Admin</p>
+                  <p className="text-xs text-blue-600 mt-1 font-medium">{user?.roles[0] || 'User'}</p>
                 </div>
                 <div className="py-2">
                   <Link

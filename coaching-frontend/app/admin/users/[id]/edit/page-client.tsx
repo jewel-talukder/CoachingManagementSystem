@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { usersApi, branchesApi } from '@/lib/api';
+import { usersApi, branchesApi, rolesApi } from '@/lib/api';
 import { useToastStore } from '@/lib/store/toastStore';
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
@@ -47,12 +47,11 @@ export default function EditUserPageClient() {
 
   const fetchRoles = async () => {
     try {
-      // Hardcoded roles - adjust IDs if needed
-      const teacherRole = { id: 3, name: 'Teacher' };
-      const studentRole = { id: 4, name: 'Student' };
-      setRoles([teacherRole, studentRole]);
+      const response = await rolesApi.getAll();
+      setRoles(response.data);
     } catch (error) {
       console.error('Failed to fetch roles:', error);
+      addToast('Failed to load roles', 'error');
     }
   };
 
