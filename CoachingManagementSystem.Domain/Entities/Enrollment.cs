@@ -20,6 +20,7 @@ public class Enrollment : BaseEntity
     public DateTime EnrollmentDate { get; set; } = DateTime.UtcNow;
     public DateTime? CompletionDate { get; set; }
     public string Status { get; set; } = "Active"; // Active, Completed, Cancelled
+    public string EnrollmentType { get; set; } = "CourseWise"; // CourseWise, BatchWise
     public decimal? FeePaid { get; set; }
     public decimal? TotalFee { get; set; }
 }

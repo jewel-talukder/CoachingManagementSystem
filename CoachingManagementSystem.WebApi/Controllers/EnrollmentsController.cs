@@ -60,6 +60,7 @@ public class EnrollmentsController : ControllerBase
                 EnrollmentDate = e.EnrollmentDate,
                 CompletionDate = e.CompletionDate,
                 Status = e.Status,
+                EnrollmentType = e.EnrollmentType,
                 FeePaid = e.FeePaid,
                 TotalFee = e.TotalFee
             })
@@ -94,6 +95,7 @@ public class EnrollmentsController : ControllerBase
                 EnrollmentDate = e.EnrollmentDate,
                 CompletionDate = e.CompletionDate,
                 Status = e.Status,
+                EnrollmentType = e.EnrollmentType,
                 FeePaid = e.FeePaid,
                 TotalFee = e.TotalFee
             })
@@ -163,20 +165,28 @@ public class EnrollmentsController : ControllerBase
         if (existingEnrollment != null)
             return BadRequest(new { message = "Student is already enrolled in this batch" });
 
-        // Calculate TotalFee: Batch MonthlyFee × Course DurationMonths
+        // Calculate TotalFee based on EnrollmentType
         decimal? calculatedTotalFee = null;
-        if (batch.MonthlyFee > 0 && course.DurationMonths > 0)
+        if (request.EnrollmentType == "BatchWise")
         {
-            calculatedTotalFee = batch.MonthlyFee * course.DurationMonths;
+            if (batch.MonthlyFee > 0 && course.DurationMonths > 0)
+            {
+                calculatedTotalFee = batch.MonthlyFee * course.DurationMonths;
+            }
+            else if (batch.MonthlyFee > 0)
+            {
+                calculatedTotalFee = batch.MonthlyFee; // Fallback to single month if duration unknown
+            }
         }
-        else if (request.TotalFee.HasValue)
+        else // CourseWise
+        {
+            calculatedTotalFee = course.Fee;
+        }
+
+        // Use requested TotalFee if provided (manual override)
+        if (request.TotalFee.HasValue)
         {
             calculatedTotalFee = request.TotalFee.Value;
-        }
-        else if (course.Fee.HasValue)
-        {
-            // Fallback to course fee if batch monthly fee is not set
-            calculatedTotalFee = course.Fee.Value;
         }
 
         using var transaction = await _context.BeginTransactionAsync();
@@ -191,6 +201,7 @@ public class EnrollmentsController : ControllerBase
                 BatchId = request.BatchId,
                 EnrollmentDate = DateTime.UtcNow,
                 Status = "Active",
+                EnrollmentType = request.EnrollmentType ?? "CourseWise",
                 FeePaid = request.FeePaid,
                 TotalFee = calculatedTotalFee
             };

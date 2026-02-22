@@ -49,6 +49,7 @@ public class GetAllCoursesQueryHandler
                     Code = c.Code,
                     Fee = c.Fee,
                     DurationMonths = c.DurationMonths,
+                    StartDate = c.StartDate,
                     IsActive = c.IsActive,
                     TeacherId = c.TeacherId,
                     TeacherName = c.Teacher != null ? $"{c.Teacher.User.FirstName} {c.Teacher.User.LastName}" : null,

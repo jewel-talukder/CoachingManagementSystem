@@ -75,6 +75,7 @@ export default function CoursesPage() {
                       </div>
                       <div className="text-sm text-gray-500">
                         {course.durationMonths} months
+                        {course.startDate && ` (Starts: ${new Date(course.startDate).toLocaleDateString()})`}
                       </div>
                     </div>
                     <span

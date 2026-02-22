@@ -47,6 +47,7 @@ public class CreateCourseCommandHandler
                 Code = command.Request.Code,
                 Fee = command.Request.Fee,
                 DurationMonths = command.Request.DurationMonths,
+                StartDate = command.Request.StartDate,
                 TeacherId = command.Request.TeacherId,
                 IsActive = true
             };
@@ -62,6 +63,7 @@ public class CreateCourseCommandHandler
                 Code = course.Code,
                 Fee = course.Fee,
                 DurationMonths = course.DurationMonths,
+                StartDate = course.StartDate,
                 IsActive = course.IsActive,
                 TeacherId = course.TeacherId
             };

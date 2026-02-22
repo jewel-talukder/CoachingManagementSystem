@@ -11,6 +11,7 @@ const enrollmentSchema = z.object({
   studentId: z.number().min(1, 'Student is required'),
   courseId: z.number().min(1, 'Course is required'),
   batchId: z.number().min(1, 'Batch is required'),
+  enrollmentType: z.enum(['CourseWise', 'BatchWise']),
   feePaid: z.number().min(0).optional(),
   totalFee: z.number().min(0).optional(),
 });
@@ -71,6 +72,7 @@ export default function NewEnrollmentPage() {
 
   const courseId = watch('courseId');
   const batchId = watch('batchId');
+  const enrollmentType = watch('enrollmentType');
 
   useEffect(() => {
     if (courseId) {
@@ -78,18 +80,24 @@ export default function NewEnrollmentPage() {
     }
   }, [courseId, setValue]);
 
-  // Auto-calculate TotalFee when batch or course changes
+  // Auto-calculate TotalFee when batch, course, or enrollment type changes
   useEffect(() => {
-    if (batchId && courseId && batches.length > 0 && courses.length > 0) {
-      const selectedBatch = batches.find(b => b.id === batchId);
+    if (courseId && courses.length > 0) {
       const selectedCourse = courses.find(c => c.id === courseId);
+      const selectedBatch = batches.find(b => b.id === batchId);
 
-      if (selectedBatch && selectedCourse && selectedBatch.monthlyFee && selectedCourse.durationMonths) {
-        const calculatedTotalFee = selectedBatch.monthlyFee * selectedCourse.durationMonths;
-        setValue('totalFee', calculatedTotalFee);
+      if (enrollmentType === 'BatchWise') {
+        if (selectedBatch && selectedCourse && selectedBatch.monthlyFee && selectedCourse.durationMonths) {
+          const calculatedTotalFee = selectedBatch.monthlyFee * selectedCourse.durationMonths;
+          setValue('totalFee', calculatedTotalFee);
+        }
+      } else {
+        if (selectedCourse) {
+          setValue('totalFee', selectedCourse.fee || 0);
+        }
       }
     }
-  }, [batchId, courseId, batches, courses, setValue]);
+  }, [batchId, courseId, enrollmentType, batches, courses, setValue]);
 
   const onSubmit = async (data: EnrollmentFormData) => {
     setError(null);
@@ -182,6 +190,23 @@ export default function NewEnrollmentPage() {
           </div>
 
           <div>
+            <label htmlFor="enrollmentType" className="block text-sm font-medium text-gray-700">
+              Enrollment Type *
+            </label>
+            <select
+              {...register('enrollmentType')}
+              id="enrollmentType"
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-3 py-2 border"
+            >
+              <option value="CourseWise">Course Wise (Fixed Total Fee)</option>
+              <option value="BatchWise">Batch Wise (Monthly Recurring)</option>
+            </select>
+            {errors.enrollmentType && (
+              <p className="mt-1 text-sm text-red-600">{errors.enrollmentType.message}</p>
+            )}
+          </div>
+
+          <div>
             <label htmlFor="totalFee" className="block text-sm font-medium text-gray-700">
               Total Fee (Taka) {batchId && courseId && (
                 <span className="text-xs text-gray-500">(Auto-calculated, can be changed)</span>
@@ -195,9 +220,13 @@ export default function NewEnrollmentPage() {
               min="0"
               className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-3 py-2 border"
             />
-            {batchId && courseId && (
+            {enrollmentType === 'BatchWise' ? (
               <p className="mt-1 text-xs text-gray-500">
                 Auto-calculated as: Batch Monthly Fee × Course Duration. You can modify if needed.
+              </p>
+            ) : (
+              <p className="mt-1 text-xs text-gray-500">
+                Auto-calculated from Course Fee. You can modify if needed.
               </p>
             )}
           </div>

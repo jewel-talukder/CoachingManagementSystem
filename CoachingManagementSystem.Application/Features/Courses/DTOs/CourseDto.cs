@@ -8,6 +8,7 @@ public class CourseDto
     public string? Code { get; set; }
     public decimal? Fee { get; set; }
     public int DurationMonths { get; set; }
+    public DateTime? StartDate { get; set; }
     public bool IsActive { get; set; }
     public int? TeacherId { get; set; }
     public string? TeacherName { get; set; }
@@ -22,6 +23,7 @@ public class CreateCourseRequest
     public string? Code { get; set; }
     public decimal? Fee { get; set; }
     public int DurationMonths { get; set; }
+    public DateTime? StartDate { get; set; }
     public int? TeacherId { get; set; }
 }
 
@@ -32,6 +34,7 @@ public class UpdateCourseRequest
     public string? Code { get; set; }
     public decimal? Fee { get; set; }
     public int DurationMonths { get; set; }
+    public DateTime? StartDate { get; set; }
     public bool IsActive { get; set; }
     public int? TeacherId { get; set; }
 }

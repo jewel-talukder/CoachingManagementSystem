@@ -13,6 +13,7 @@ const courseSchema = z.object({
   code: z.string().optional(),
   fee: z.number().min(0).optional(),
   durationMonths: z.number().min(1, 'Duration must be at least 1 month'),
+  startDate: z.string().min(1, 'Start date is required'),
   teacherId: z.number().optional(),
 });
 
@@ -123,6 +124,21 @@ export default function NewCoursePage() {
             />
             {errors.durationMonths && (
               <p className="mt-1 text-sm text-red-600">{errors.durationMonths.message}</p>
+            )}
+          </div>
+
+          <div>
+            <label htmlFor="startDate" className="block text-sm font-medium text-gray-700">
+              Start Date *
+            </label>
+            <input
+              {...register('startDate')}
+              type="date"
+              id="startDate"
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-3 py-2 border"
+            />
+            {errors.startDate && (
+              <p className="mt-1 text-sm text-red-600">{errors.startDate.message}</p>
             )}
           </div>
         </div>

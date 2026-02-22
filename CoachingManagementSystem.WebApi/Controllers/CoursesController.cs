@@ -93,6 +93,59 @@ public class CoursesController : ControllerBase
         return CreatedAtAction(nameof(GetAll), new { id = result.Data!.Id }, result);
     }
 
+    [HttpPut("{id}")]
+    [Authorize(Roles = "Coaching Admin,Super Admin")]
+    public async Task<ActionResult> Update(int id, [FromBody] UpdateCourseRequest request)
+    {
+        var coachingId = GetCoachingId();
+        if (coachingId == null)
+            return Unauthorized();
+
+        var course = await _context.Courses
+            .FirstOrDefaultAsync(c => c.Id == id && c.CoachingId == coachingId.Value && !c.IsDeleted);
+
+        if (course == null)
+            return NotFound(new { message = "Course not found" });
+
+        // Update fields
+        course.Name = request.Name;
+        course.Description = request.Description;
+        course.Code = request.Code;
+        course.Fee = request.Fee;
+        course.DurationMonths = request.DurationMonths;
+        course.StartDate = request.StartDate;
+        course.IsActive = request.IsActive;
+        course.TeacherId = request.TeacherId;
+        course.UpdatedAt = DateTime.UtcNow;
+
+        await _context.SaveChangesAsync();
+
+        return Ok(new { message = "Course updated successfully" });
+    }
+
+    [HttpDelete("{id}")]
+    [Authorize(Roles = "Coaching Admin,Super Admin")]
+    public async Task<ActionResult> Delete(int id)
+    {
+        var coachingId = GetCoachingId();
+        if (coachingId == null)
+            return Unauthorized();
+
+        var course = await _context.Courses
+            .FirstOrDefaultAsync(c => c.Id == id && c.CoachingId == coachingId.Value && !c.IsDeleted);
+
+        if (course == null)
+            return NotFound(new { message = "Course not found" });
+
+        // Soft delete
+        course.IsDeleted = true;
+        course.UpdatedAt = DateTime.UtcNow;
+
+        await _context.SaveChangesAsync();
+
+        return Ok(new { message = "Course deleted successfully" });
+    }
+
     private int? GetCoachingId()
     {
         var coachingIdClaim = User.FindFirst("coachingId");

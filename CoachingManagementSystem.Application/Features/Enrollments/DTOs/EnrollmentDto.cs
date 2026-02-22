@@ -12,6 +12,7 @@ public class EnrollmentDto
     public DateTime EnrollmentDate { get; set; }
     public DateTime? CompletionDate { get; set; }
     public string Status { get; set; } = string.Empty;
+    public string EnrollmentType { get; set; } = string.Empty;
     public decimal? FeePaid { get; set; }
     public decimal? TotalFee { get; set; }
 }
@@ -21,6 +22,7 @@ public class CreateEnrollmentRequest
     public int StudentId { get; set; }
     public int CourseId { get; set; }
     public int BatchId { get; set; }
+    public string EnrollmentType { get; set; } = "CourseWise";
     public decimal? FeePaid { get; set; }
     public decimal? TotalFee { get; set; }
 }
@@ -31,6 +33,7 @@ public class UpdateEnrollmentRequest
     public int? CourseId { get; set; }
     public int? BatchId { get; set; }
     public string? Status { get; set; }
+    public string? EnrollmentType { get; set; }
     public decimal? FeePaid { get; set; }
     public decimal? TotalFee { get; set; }
 }
