@@ -130,7 +130,7 @@ using (var scope = app.Services.CreateScope())
     var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
     try
     {
-        context.Database.EnsureCreated();
+        context.Database.Migrate();
         CoachingManagementSystem.Infrastructure.Data.DbSeeder.SeedRolesAsync(context).Wait();
         CoachingManagementSystem.Infrastructure.Data.DbSeeder.SeedPlansAsync(context).Wait();
         CoachingManagementSystem.Infrastructure.Data.DbSeeder.SeedMainAdminAsync(context).Wait();
